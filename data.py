@@ -24,7 +24,7 @@ class MotionFilenames:
         return x_path, y_path
 
 class GenericFilenames:
-    def __init__(self, stem, image, label, ext, size):
+    def __init__(self, stem, image, label, ext, size, offset = 0):
         self.stem = stem
         self.image = image
         self.label = label
@@ -35,15 +35,25 @@ class GenericFilenames:
         return self.size
 
     def __getitem__(self, i):
-        x_path = self.stem + self.image + str(i) + self.ext
-        y_path = self.stem + self.label + str(i) + self.ext
+        x_path = self.stem + self.image + str(i + self.offset) + self.ext
+        y_path = self.stem + self.label + str(i + self.offset) + self.ext
         return x_path, y_path
+
+    def split(self, proportions):
+        splitted_filenames = []
+        offset = 0
+        for p in proportions:
+            splitted_filenames.append(GenericFilenames(self.stem, self.image,
+                    self.label, self.ext, self.size * p, offset = offset))
+            offset += self.size * p
+        return splitted_filenames
 
 class MotionCorrDataset(Dataset):
     def __init__(self, filenames, load_func, transform = None):
         self.filenames = filenames
         self.load_func = load_func
         self.transform = transform
+        self.train_test = train_test
 
     def __len__(self):
         return (len(self.filenames))

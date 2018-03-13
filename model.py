@@ -1,5 +1,5 @@
 """
-TODO: prelu requires weights
+TODO: pPReLU requires weights
     No softmax (motion, not segmentation)
 """
 
@@ -138,27 +138,27 @@ class VNet(nn.Module):
 
     def forward(self, x):
         x1 = self.conv1(x) # (1, 128, 128, 68) -> (16, 128, 128, 64)
-        x = F.relu(self.downconv1(x1)) # (16, 128, 128, 64) -> (16, 64, 64, 32)
+        x = F.PReLU(self.downconv1(x1)) # (16, 128, 128, 64) -> (16, 64, 64, 32)
         x2 = self.conv2(x) # (16, 64, 64, 32) -> (32, 64, 64, 32)
-        x = F.relu(self.downconv2(x2)) # (32, 64, 64, 32) -> (32, 32, 32, 16)
+        x = F.PReLU(self.downconv2(x2)) # (32, 64, 64, 32) -> (32, 32, 32, 16)
         x3 = self.conv3(x) # (32, 32, 32, 16) -> (64, 32, 32, 16)
-        x = F.relu(self.downconv3(x3)) # (64, 32, 32, 16) -> (64, 16, 16, 8)
+        x = F.PReLU(self.downconv3(x3)) # (64, 32, 32, 16) -> (64, 16, 16, 8)
         x4 = self.conv4(x) # (64, 16, 16, 8) -> (128, 16, 16, 8)
-        x = F.relu(self.downconv4(x4)) # (128, 16, 16, 8) -> (128, 8, 8, 4)
+        x = F.PReLU(self.downconv4(x4)) # (128, 16, 16, 8) -> (128, 8, 8, 4)
         # (128, 8, 8, 4) --conv-> (256, 8, 8, 4) --upconv-> (128, 16, 16, 8)
         # --concat-> (256, 16, 16, 8)
-        x = concat(x4, F.relu(self.upconv5(self.conv5(x))))
+        x = concat(x4, F.PReLU(self.upconv5(self.conv5(x))))
         # (256, 16, 16, 8) -> (128, 16, 16, 8) -> (64, 32, 32, 16)
         # -> (128, 32, 32, 16)
-        x = concat(x3, F.relu(self.upconv6(self.conv6(x))))
+        x = concat(x3, F.PReLU(self.upconv6(self.conv6(x))))
         # (128, 32, 32, 16) -> (64, 64, 64, 32)
-        x = concat(x2, F.relu(self.upconv7(self.conv7(x))))
+        x = concat(x2, F.PReLU(self.upconv7(self.conv7(x))))
         # (64, 64, 64, 32) -> (32, 128, 128, 64)
-        x = concat(x1, F.relu(self.upconv8(self.conv8(x))))
+        x = concat(x1, F.PReLU(self.upconv8(self.conv8(x))))
         # (32, 128, 128, 64) -> (16, 128, 128, 68)
-        x = F.relu(self.conv9(x))
+        x = F.PReLU(self.conv9(x))
 
         x = x.view(-1, num_flat_features(x)) # flatten for fc
-        x = F.relu(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
+        x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
         x = self.fc2(x) # (1 * 128 * 128 * 68) -> (1 * 12 * 128 * 68)
         return x
