@@ -12,7 +12,7 @@ def compute_loss(dataset, criterion):
     for example in dataset:
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
-        label = label.view(-1, num_flat_features(label))
+        # label = label.view(-1, num_flat_features(label))
         output = net(image)
         running_loss += criterion(output, label).data[0]
     return running_loss / len(dataset)
@@ -28,16 +28,17 @@ train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 net = VNet()
-criterion = nn.MSELoss()
+criterion = torch.nn.MSELoss()
 optimizer = optim.SGD(net.parameters(), lr = 0.001, momentum = 0.9)
 
+losses = []
 for epoch in range(num_epochs):
 
     running_loss = 0.0
     for i, example in enumerate(train):
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
-        label = label.view(-1, num_flat_features(label))
+        # label = label.view(-1, num_flat_features(label))
 
         optimizer.zero_grad()
 
@@ -49,9 +50,12 @@ for epoch in range(num_epochs):
         running_loss += loss.data[0]
         if i % display_every_i == display_every_i - 1:    # print every 2000 mini-batches
             test_loss = compute_loss(test, criterion)
+            train_loss = running_loss / display_every_i
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / display_every_i, test_loss))
+                  (epoch + 1, i + 1, train_loss, test_loss))
             running_loss = 0.0
+            losses.append([train_loss, test_loss])
 
 torch.save(net.state_dict(), 'output/model.pth')
+np.save(np.array(losses), 'output/loss.npy')
 print('Finished Training')

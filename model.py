@@ -54,14 +54,13 @@ class VNet(nn.Module):
         self.upconv7 = nn.ConvTranspose3d(64, 32, 2, stride = 2)
         self.upconv8 = nn.ConvTranspose3d(32, 16, 2, stride = 2)
 
-        self.fc1 = nn.Linear(16 * 128 * 128 * 68, 1 * 128 * 128 * 68)
-        self.fc2 = nn.Linear(1 * 128 * 128 * 68, 1 * 128 * 128 * 68)
+        self.conv10 = self.conv3d_padded(16, 1, 1, 1, (128, 128, 68), (128, 128, 68), "conv10_1")
 
     def conv3d_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
         if not name in self.conv_dict:
             conv = nn.Conv3d(ch_in, ch_out, kernel, stride = stride,
                 padding = pad_full(d_in, d_out, kernel, stride))
-            self.add_module(conv)
+            self.add_module(name, conv)
             self.conv_dict[name] = conv
         return self.conv_dict[name]
 
@@ -153,7 +152,9 @@ class VNet(nn.Module):
         # (32, 128, 128, 64) -> (16, 128, 128, 68)
         x = F.PReLU(self.conv9(x))
 
-        x = x.view(-1, num_flat_features(x)) # flatten for fc
-        x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
-        x = self.fc2(x) # (1 * 128 * 128 * 68) -> (1 * 12 * 128 * 68)
+        # x = x.view(-1, num_flat_features(x)) # flatten for fc
+        # x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
+        # x = self.fc2(x) # (1 * 128 * 128 * 68) -> (1 * 12 * 128 * 68)
+
+        x = self.conv10(x) #(16, 128, 128, 68) -> (1, 128, 128, 68)
         return x
