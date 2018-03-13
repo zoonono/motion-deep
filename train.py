@@ -39,6 +39,7 @@ for epoch in range(num_epochs):
     for i, example in enumerate(train):
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
+        image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
         # label = label.view(-1, num_flat_features(label))
 
         optimizer.zero_grad()

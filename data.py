@@ -54,14 +54,8 @@ class ToTensor(object):
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
 
-        # swap color axis because
-        # numpy image: H x W x D
-        # torch image: C X H X W
-        #           or C X D X H X W
-        image = image[None,:,:,:].transpose((0, 3, 1, 2))
-        label = label[None,:,:,:].transpose((0, 3, 1, 2))
-        return {'image': torch.from_numpy(image),
-                'label': torch.from_numpy(label)}
+        return {'image': torch.from_numpy(image).float(),
+                'label': torch.from_numpy(label).float()}
 
 class Transpose4D(object):
     """Transpose ndarrays to C X D X H X W."""

@@ -1,3 +1,5 @@
+"""TODO: add size param, put tile_add back after."""
+
 import torch
 import torch.nn as nn
 
@@ -5,7 +7,9 @@ from math import ceil
 
 def pad(d_in, d_out, kernel, stride):
     """Returns padding such that a convolution produces d_out given d_in.
-    Only works if such a padding is possible."""
+    Only works if such a padding is possible.
+    out = (1 / stride)((in + 2 * padding) - kernel) + 1
+    """
     return ceil(((d_out - 1) * stride + kernel - d_in) / 2)
 
 def pad_full(d_in, d_out, kernel, stride):
@@ -13,17 +17,19 @@ def pad_full(d_in, d_out, kernel, stride):
                   for i in range(len(d_in))])
 
 def concat(a, b):
-    return torch.cat((a, b), 0)
+    """Assumes a and b are B x C x H x W x D.
+    """
+    return torch.cat((a, b), 1)
 
 def tile_add(x, y):
-    """Assumes x and y are C x H x W x D. Adds x and y elementwise by tiling
+    """Assumes x and y are B x C x H x W x D. Adds x and y elementwise by tiling
     the smaller along the C dimension. H, W, and D must be the same and C_x
     must be a multiple of C_y (or the other way around).
     """
-    if x.shape[0] > y.shape[0]:
+    if x.shape[1] > y.shape[1]:
         x, y = y, x
-    ratio = y.shape[0] // x.shape[0]
-    return x.repeat(ratio, 1, 1, 1) + y
+    ratio = y.shape[1] // x.shape[1]
+    return x.repeat(1, ratio, 1, 1, 1) + y
 
 def num_flat_features(self, x):
     size = x.size()[1:] # all dimensions but the batch
@@ -33,11 +39,11 @@ def num_flat_features(self, x):
     return num_features
 
 class VNet(nn.Module):
+    """V-net architecture: https://arxiv.org/abs/1606.04797
+    """
     def __init__(self):
         super(VNet, self).__init__()
-        # 1 x 128 x 128 x 68
-        # out = (1 / stride)((in + 2 * padding) - kernel) + 1
-        # V-net architecture: https://arxiv.org/abs/1606.04797
+
         self.conv_dict = {}
         self.downconv1 = nn.Conv3d(16, 16, 2, stride = 2)
         self.downconv2 = nn.Conv3d(32, 32, 2, stride = 2)
@@ -68,9 +74,9 @@ class VNet(nn.Module):
         return self.conv_dict[name]
 
     def conv1(self, x):
-        a = x.clone()
+        # a = x.clone()
         x = self.conv3d_padded(1, 16, 5, 1, (128, 128, 68), (128, 128, 64), "conv1_1")(x)
-        x = tile_add(a, x)
+        # x = tile_add(a, x)
         return x
 
     def conv2(self, x):
@@ -104,33 +110,37 @@ class VNet(nn.Module):
         x = tile_add(a, x)
         return x
 
-    def conv6(self, x):
-        a = x.clone()
+    def conv6(self, x, cat):
+        a = x.clone() # 128 16 16 8
+        x = concat(x, cat) # 256 16 16 8
         x = self.conv3d_padded(256, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_1")(x)
         x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_2")(x)
         x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_3")(x)
-        x = tile_add(a, x)
+        x = tile_add(a, x) # 128 16 16 8
         return x
 
-    def conv7(self, x):
+    def conv7(self, x, cat):
         a = x.clone()
+        x = concat(x, cat)
         x = self.conv3d_padded(128, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
         x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
         x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
         x = tile_add(a, x)
         return x
 
-    def conv8(self, x):
+    def conv8(self, x, cat):
         a = x.clone()
+        x = concat(x, cat)
         x = self.conv3d_padded(64, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv8_1")(x)
         x = self.conv3d_padded(32, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv8_2")(x)
         x = tile_add(a, x)
         return x
 
-    def conv9(self, x):
-        a = x.clone()
+    def conv9(self, x, cat):
+        # a = x.clone()
+        x = concat(x, cat)
         x = self.conv3d_padded(32, 16, 5, 1, (128, 128, 64), (128, 128, 68), "conv9_1")(x)
-        x = tile_add(a, x)
+        # x = tile_add(a, x)
         return x
 
     def forward(self, x):
@@ -143,17 +153,19 @@ class VNet(nn.Module):
         x4 = self.conv4(x) # (64, 16, 16, 8) -> (128, 16, 16, 8)
         x = self.prelu4(self.downconv4(x4)) # (128, 16, 16, 8) -> (128, 8, 8, 4)
         # (128, 8, 8, 4) --conv-> (256, 8, 8, 4) --upconv-> (128, 16, 16, 8)
+        x = self.prelu5(self.upconv5(self.conv5(x)))
         # --concat-> (256, 16, 16, 8)
-        x = concat(x4, self.prelu5(self.upconv5(self.conv5(x))))
         # (256, 16, 16, 8) -> (128, 16, 16, 8) -> (64, 32, 32, 16)
+        x = self.prelu6(self.upconv6(self.conv6(x, x4)))
         # -> (128, 32, 32, 16)
-        x = concat(x3, self.prelu6(self.upconv6(self.conv6(x))))
-        # (128, 32, 32, 16) -> (64, 64, 64, 32)
-        x = concat(x2, self.prelu7(self.upconv7(self.conv7(x))))
-        # (64, 64, 64, 32) -> (32, 128, 128, 64)
-        x = concat(x1, self.prelu8(self.upconv8(self.conv8(x))))
+        # (128, 32, 32, 16) -> (32, 64, 64, 32)
+        x = self.prelu7(self.upconv7(self.conv7(x, x3)))
+        # -> (64, 64, 64, 32)
+        # (64, 64, 64, 32) -> (16, 128, 128, 64)
+        x = self.prelu8(self.upconv8(self.conv8(x, x2)))
+        # -> (32, 128, 128, 64)
         # (32, 128, 128, 64) -> (16, 128, 128, 68)
-        x = self.prelu9(self.conv9(x))
+        x = self.prelu9(self.conv9(x, x1))
 
         # x = x.view(-1, num_flat_features(x)) # flatten for fc
         # x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
