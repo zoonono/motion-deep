@@ -30,6 +30,7 @@ class GenericFilenames:
         self.label = label
         self.ext = ext
         self.size = size
+        self.offset = offset
 
     def __len__(self):
         return self.size
@@ -53,7 +54,6 @@ class MotionCorrDataset(Dataset):
         self.filenames = filenames
         self.load_func = load_func
         self.transform = transform
-        self.train_test = train_test
 
     def __len__(self):
         return (len(self.filenames))

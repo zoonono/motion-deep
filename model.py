@@ -1,8 +1,3 @@
-"""
-TODO: pPReLU requires weights
-    No softmax (motion, not segmentation)
-"""
-
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -17,7 +12,7 @@ from math import ceil
 def pad(d_in, d_out, kernel, stride):
     """Returns padding such that a convolution produces d_out given d_in.
     Only works if such a padding is possible."""
-	return ceil(((d_out - 1) * stride + kernel - d_in) / 2)
+    return ceil(((d_out - 1) * stride + kernel - d_in) / 2)
 
 def pad_full(d_in, d_out, kernel, stride):
     return tuple([pad(d_in[i], d_out[i], kernel, stride)
@@ -45,7 +40,7 @@ def num_flat_features(self, x):
 
 class VNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
+        super(VNet, self).__init__()
         # 1 x 128 x 128 x 68
         # out = (1 / stride)((in + 2 * padding) - kernel) + 1
         # V-net architecture: https://arxiv.org/abs/1606.04797
