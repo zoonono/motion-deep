@@ -21,7 +21,7 @@ num_epochs = 1
 display_every_i = 10
 
 t = transforms.Compose([Transpose4D(), ToTensor()])
-filenames = GenericFilenames('motion_data_resid/', 'motion_corrupt_',
+filenames = GenericFilenames('/motion_data_resid/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128)
 train_filenames, test_filenames = filenames.split((0.8, 0.2))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)

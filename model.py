@@ -123,8 +123,8 @@ class VNet(nn.Module):
         a = x.clone()
         x = concat(x, cat)
         x = self.conv3d_padded(128, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_2")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_3")(x)
         x = tile_add(a, x)
         return x
 
