@@ -58,12 +58,12 @@ class VNet(nn.Module):
         self.fc2 = nn.Linear(1 * 128 * 128 * 68, 1 * 128 * 128 * 68)
 
     def conv3d_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
-        if not name in conv_dict:
+        if not name in self.conv_dict:
             conv = nn.Conv3d(ch_in, ch_out, kernel, stride = stride,
                 padding = pad_full(d_in, d_out, kernel, stride))
             self.add_module(conv)
-            conv_dict[name] = conv
-        return conv_dict[name]
+            self.conv_dict[name] = conv
+        return self.conv_dict[name]
 
     def conv1(self, x):
         a = x.clone()
