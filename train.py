@@ -32,6 +32,7 @@ criterion = torch.nn.MSELoss()
 optimizer = optim.SGD(net.parameters(), lr = 0.001, momentum = 0.9)
 
 losses = []
+print('Beginning Training...')
 for epoch in range(num_epochs):
 
     running_loss = 0.0

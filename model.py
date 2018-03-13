@@ -1,12 +1,6 @@
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
 
-import data
 from math import ceil
 
 def pad(d_in, d_out, kernel, stride):
@@ -53,6 +47,15 @@ class VNet(nn.Module):
         self.upconv6 = nn.ConvTranspose3d(128, 64, 2, stride = 2)
         self.upconv7 = nn.ConvTranspose3d(64, 32, 2, stride = 2)
         self.upconv8 = nn.ConvTranspose3d(32, 16, 2, stride = 2)
+        self.prelu1 = nn.PReLU(num_parameters = 16)
+        self.prelu2 = nn.PReLU(num_parameters = 32)
+        self.prelu3 = nn.PReLU(num_parameters = 64)
+        self.prelu4 = nn.PReLU(num_parameters = 128)
+        self.prelu8 = nn.PReLU(num_parameters = 16)
+        self.prelu7 = nn.PReLU(num_parameters = 32)
+        self.prelu6 = nn.PReLU(num_parameters = 64)
+        self.prelu5 = nn.PReLU(num_parameters = 128)
+        self.prelu9 = nn.PReLU(num_parameters = 16)
 
         self.conv10 = self.conv3d_padded(16, 1, 1, 1, (128, 128, 68), (128, 128, 68), "conv10_1")
 
@@ -132,25 +135,25 @@ class VNet(nn.Module):
 
     def forward(self, x):
         x1 = self.conv1(x) # (1, 128, 128, 68) -> (16, 128, 128, 64)
-        x = F.PReLU(self.downconv1(x1)) # (16, 128, 128, 64) -> (16, 64, 64, 32)
+        x = self.prelu1(self.downconv1(x1)) # (16, 128, 128, 64) -> (16, 64, 64, 32)
         x2 = self.conv2(x) # (16, 64, 64, 32) -> (32, 64, 64, 32)
-        x = F.PReLU(self.downconv2(x2)) # (32, 64, 64, 32) -> (32, 32, 32, 16)
+        x = self.prelu2(self.downconv2(x2)) # (32, 64, 64, 32) -> (32, 32, 32, 16)
         x3 = self.conv3(x) # (32, 32, 32, 16) -> (64, 32, 32, 16)
-        x = F.PReLU(self.downconv3(x3)) # (64, 32, 32, 16) -> (64, 16, 16, 8)
+        x = self.prelu3(self.downconv3(x3)) # (64, 32, 32, 16) -> (64, 16, 16, 8)
         x4 = self.conv4(x) # (64, 16, 16, 8) -> (128, 16, 16, 8)
-        x = F.PReLU(self.downconv4(x4)) # (128, 16, 16, 8) -> (128, 8, 8, 4)
+        x = self.prelu4(self.downconv4(x4)) # (128, 16, 16, 8) -> (128, 8, 8, 4)
         # (128, 8, 8, 4) --conv-> (256, 8, 8, 4) --upconv-> (128, 16, 16, 8)
         # --concat-> (256, 16, 16, 8)
-        x = concat(x4, F.PReLU(self.upconv5(self.conv5(x))))
+        x = concat(x4, self.prelu5(self.upconv5(self.conv5(x))))
         # (256, 16, 16, 8) -> (128, 16, 16, 8) -> (64, 32, 32, 16)
         # -> (128, 32, 32, 16)
-        x = concat(x3, F.PReLU(self.upconv6(self.conv6(x))))
+        x = concat(x3, self.prelu6(self.upconv6(self.conv6(x))))
         # (128, 32, 32, 16) -> (64, 64, 64, 32)
-        x = concat(x2, F.PReLU(self.upconv7(self.conv7(x))))
+        x = concat(x2, self.prelu7(self.upconv7(self.conv7(x))))
         # (64, 64, 64, 32) -> (32, 128, 128, 64)
-        x = concat(x1, F.PReLU(self.upconv8(self.conv8(x))))
+        x = concat(x1, self.prelu8(self.upconv8(self.conv8(x))))
         # (32, 128, 128, 64) -> (16, 128, 128, 68)
-        x = F.PReLU(self.conv9(x))
+        x = self.prelu9(self.conv9(x))
 
         # x = x.view(-1, num_flat_features(x)) # flatten for fc
         # x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
