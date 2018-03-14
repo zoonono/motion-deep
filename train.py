@@ -19,13 +19,13 @@ def compute_loss(dataset, criterion):
 
 num_epochs = 1
 display_every_i = 10
-size = np.array((128, 128, 68)) // 2
+size = np.array((128, 128, 68))
 
 # Assumes images start as H x W x D x C
-t = transforms.Compose([Decimate(axes = (0, 1, 2)), Transpose4D(), ToTensor()])
+t = transforms.Compose([Transpose4D(), ToTensor()])
 filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128)
-train_filenames, test_filenames = filenames.split((0.8, 0.2))
+train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
@@ -39,6 +39,8 @@ for epoch in range(num_epochs):
 
     running_loss = 0.0
     for i, example in enumerate(train):
+        start_time = time.time()
+
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
         image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
@@ -52,11 +54,11 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         running_loss += loss.data[0]
-        if i % display_every_i == display_every_i - 1:    # print every 2000 mini-batches
+        if i % display_every_i == display_every_i - 1:
             test_loss = compute_loss(test, criterion)
             train_loss = running_loss / display_every_i
-            print('[%d, %5d] Training loss: %.3f, Test loss: %.3f' %
-                  (epoch + 1, i + 1, train_loss, test_loss))
+            print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
+                  (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
             running_loss = 0.0
             losses.append([train_loss, test_loss])
 

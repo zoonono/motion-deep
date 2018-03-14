@@ -27,8 +27,8 @@ class GenericFilenames:
         offset = 0
         for p in proportions:
             splitted_filenames.append(GenericFilenames(self.stem, self.image,
-                    self.label, self.ext, self.size * p, offset = offset))
-            offset += self.size * p
+                    self.label, self.ext, int(self.size * p), offset = offset))
+            offset += int(self.size * p)
         return splitted_filenames
 
 class MotionCorrDataset(Dataset):
