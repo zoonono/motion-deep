@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from scipy.signal import decimate
 import time
 
 class GenericFilenames:
@@ -48,14 +49,36 @@ class MotionCorrDataset(Dataset):
             sample = self.transform(sample)
         return sample
 
+class Decimate(object):
+    """Undersample each axis by some factor."""
+    def __init__(self, factor = 2, axes = None):
+        self.factor = factor
+        self.axes = axes # if None, decimate all axes
+
+    def downsample(self, arr):
+        """Downsamples axes in array by factor of 2 using scipy's decimate."""
+        if self.axes:
+            for axis in self.axes:
+                arr = decimate(arr, self.factor, axis = axis)
+        else: # if there is no specified list of axes, decimate all axes
+            for axis in range(len(arr.shape)):
+                arr = decimate(arr, self.factor, axis = axis)
+        return arr
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        return {'image': self.downsample(image),
+                'label': self.downsample(label)}
+
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
 
-        return {'image': torch.from_numpy(image).float(),
-                'label': torch.from_numpy(label).float()}
+        return {'image': torch.from_numpy(image.copy()).float(),
+                'label': torch.from_numpy(label.copy()).float()}
 
 class Transpose4D(object):
     """Transpose ndarrays to C X D X H X W."""

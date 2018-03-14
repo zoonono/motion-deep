@@ -2,8 +2,8 @@ import torch
 from torch.autograd import Variable
 import torch.optim as optim
 import numpy as np
-from model import VNet, num_flat_features
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose4D
+from model import VNet
+from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose4D, Decimate
 from torchvision import transforms
 import time
 
@@ -19,15 +19,17 @@ def compute_loss(dataset, criterion):
 
 num_epochs = 1
 display_every_i = 10
+size = np.array((128, 128, 68)) // 2
 
-t = transforms.Compose([Transpose4D(), ToTensor()])
-filenames = GenericFilenames('/motion_data_resid/', 'motion_corrupt_',
+# Assumes images start as H x W x D x C
+t = transforms.Compose([Decimate(axes = (0, 1, 2)), Transpose4D(), ToTensor()])
+filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128)
 train_filenames, test_filenames = filenames.split((0.8, 0.2))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
-net = VNet()
+net = VNet(size)
 criterion = torch.nn.MSELoss()
 optimizer = optim.SGD(net.parameters(), lr = 0.001, momentum = 0.9)
 

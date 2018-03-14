@@ -1,19 +1,28 @@
-"""TODO: add size param, put tile_add back after."""
-
 import torch
 import torch.nn as nn
+import numpy as np
 
 from math import ceil
 
 def pad(d_in, d_out, kernel, stride):
     """Returns padding such that a convolution produces d_out given d_in.
     Only works if such a padding is possible.
-    out = (1 / stride)((in + 2 * padding) - kernel) + 1
+    out = (1 / stride)(in + 2 * padding - kernel) + 1
     """
-    return ceil(((d_out - 1) * stride + kernel - d_in) / 2)
+    return int(ceil(((d_out - 1) * stride + kernel - d_in) / 2))
+
+def pad_out_t(d_in, d_out, kernel, stride):
+    """Pads the output of conv_transpose, d_out >= (d_in - 1) * stride + kernel
+    d_out = (d_in - 1) * stride + kernel
+    """
+    return int(d_out - ((d_in - 1) * stride + kernel)) # np.int32 -> int
 
 def pad_full(d_in, d_out, kernel, stride):
     return tuple([pad(d_in[i], d_out[i], kernel, stride)
+                  for i in range(len(d_in))])
+
+def pad_out_t_full(d_in, d_out, kernel, stride):
+    return tuple([pad_out_t(d_in[i], d_out[i], kernel, stride)
                   for i in range(len(d_in))])
 
 def concat(a, b):
@@ -41,18 +50,27 @@ def num_flat_features(self, x):
 class VNet(nn.Module):
     """V-net architecture: https://arxiv.org/abs/1606.04797
     """
-    def __init__(self):
+    def __init__(self, size):
         super(VNet, self).__init__()
+        self.size = np.array(size)
 
         self.conv_dict = {}
-        self.downconv1 = nn.Conv3d(16, 16, 2, stride = 2)
-        self.downconv2 = nn.Conv3d(32, 32, 2, stride = 2)
-        self.downconv3 = nn.Conv3d(64, 64, 2, stride = 2)
-        self.downconv4 = nn.Conv3d(128, 128, 2, stride = 2)
-        self.upconv5 = nn.ConvTranspose3d(256, 128, 2, stride = 2)
-        self.upconv6 = nn.ConvTranspose3d(128, 64, 2, stride = 2)
-        self.upconv7 = nn.ConvTranspose3d(64, 32, 2, stride = 2)
-        self.upconv8 = nn.ConvTranspose3d(32, 16, 2, stride = 2)
+        self.downconv1 = self.conv3d_padded(16, 16, 2, 2,
+                            self.size, self.size // 2, "downconv1")
+        self.downconv2 = self.conv3d_padded(32, 32, 2, 2,
+                            self.size // 2, self.size // 4, "downconv2")
+        self.downconv3 = self.conv3d_padded(64, 64, 2, 2,
+                            self.size // 4, self.size // 8, "downconv3")
+        self.downconv4 = self.conv3d_padded(128, 128, 2, 2,
+                            self.size // 8, self.size // 16, "downconv4")
+        self.upconv5 = self.conv3d_t_padded(256, 128, 2, 2,
+                            self.size // 16, self.size // 8, "upconv5")
+        self.upconv6 = self.conv3d_t_padded(128, 64, 2, 2,
+                            self.size // 8, self.size // 4, "upconv6")
+        self.upconv7 = self.conv3d_t_padded(64, 32, 2, 2,
+                            self.size // 4, self.size // 2, "upconv7")
+        self.upconv8 = self.conv3d_t_padded(32, 16, 2, 2,
+                            self.size // 2, self.size, "upconv8")
         self.prelu1 = nn.PReLU(num_parameters = 16)
         self.prelu2 = nn.PReLU(num_parameters = 32)
         self.prelu3 = nn.PReLU(num_parameters = 64)
@@ -73,74 +91,82 @@ class VNet(nn.Module):
             self.conv_dict[name] = conv
         return self.conv_dict[name]
 
+    def conv3d_t_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
+        if not name in self.conv_dict:
+            conv = nn.ConvTranspose3d(ch_in, ch_out, kernel, stride = stride,
+                output_padding = pad_out_t_full(d_in, d_out, kernel, stride))
+            self.add_module(name, conv)
+            self.conv_dict[name] = conv
+        return self.conv_dict[name]
+
     def conv1(self, x):
-        # a = x.clone()
-        x = self.conv3d_padded(1, 16, 5, 1, (128, 128, 68), (128, 128, 64), "conv1_1")(x)
-        # x = tile_add(a, x)
+        a = x.clone()
+        x = self.conv3d_padded(1, 16, 5, 1, self.size, self.size, "conv1_1")(x)
+        x = tile_add(a, x)
         return x
 
     def conv2(self, x):
         a = x.clone()
-        x = self.conv3d_padded(16, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv2_1")(x)
-        x = self.conv3d_padded(32, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv2_2")(x)
+        x = self.conv3d_padded(16, 32, 5, 1, self.size // 2, self.size // 2, "conv2_1")(x)
+        x = self.conv3d_padded(32, 32, 5, 1, self.size // 2, self.size // 2, "conv2_2")(x)
         x = tile_add(a, x)
         return x
 
     def conv3(self, x):
         a = x.clone()
-        x = self.conv3d_padded(32, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv3_1")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv3_2")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv3_3")(x)
+        x = self.conv3d_padded(32, 64, 5, 1, self.size // 4, self.size // 4, "conv3_1")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv3_2")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv3_3")(x)
         x = tile_add(a, x)
         return x
 
     def conv4(self, x):
         a = x.clone()
-        x = self.conv3d_padded(64, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv4_1")(x)
-        x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv4_2")(x)
-        x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv4_3")(x)
+        x = self.conv3d_padded(64, 128, 5, 1, self.size // 8, self.size // 8, "conv4_1")(x)
+        x = self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv4_2")(x)
+        x = self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv4_3")(x)
         x = tile_add(a, x)
         return x
 
     def conv5(self, x):
         a = x.clone()
-        x = self.conv3d_padded(128, 256, 5, 1, (8, 8, 4), (8, 8, 4), "conv5_1")(x)
-        x = self.conv3d_padded(256, 256, 5, 1, (8, 8, 4), (8, 8, 4), "conv5_2")(x)
-        x = self.conv3d_padded(256, 256, 5, 1, (8, 8, 4), (8, 8, 4), "conv5_3")(x)
+        x = self.conv3d_padded(128, 256, 5, 1, self.size // 16, self.size // 16, "conv5_1")(x)
+        x = self.conv3d_padded(256, 256, 5, 1, self.size // 16, self.size // 16, "conv5_2")(x)
+        x = self.conv3d_padded(256, 256, 5, 1, self.size // 16, self.size // 16, "conv5_3")(x)
         x = tile_add(a, x)
         return x
 
     def conv6(self, x, cat):
         a = x.clone() # 128 16 16 8
         x = concat(x, cat) # 256 16 16 8
-        x = self.conv3d_padded(256, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_1")(x)
-        x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_2")(x)
-        x = self.conv3d_padded(128, 128, 5, 1, (16, 16, 8), (16, 16, 8), "conv6_3")(x)
+        x = self.conv3d_padded(256, 128, 5, 1, self.size // 8, self.size // 8, "conv6_1")(x)
+        x = self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv6_2")(x)
+        x = self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv6_3")(x)
         x = tile_add(a, x) # 128 16 16 8
         return x
 
     def conv7(self, x, cat):
         a = x.clone()
         x = concat(x, cat)
-        x = self.conv3d_padded(128, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_1")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_2")(x)
-        x = self.conv3d_padded(64, 64, 5, 1, (32, 32, 16), (32, 32, 16), "conv7_3")(x)
+        x = self.conv3d_padded(128, 64, 5, 1, self.size // 4, self.size // 4, "conv7_1")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv7_2")(x)
+        x = self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv7_3")(x)
         x = tile_add(a, x)
         return x
 
     def conv8(self, x, cat):
         a = x.clone()
         x = concat(x, cat)
-        x = self.conv3d_padded(64, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv8_1")(x)
-        x = self.conv3d_padded(32, 32, 5, 1, (64, 64, 32), (64, 64, 32), "conv8_2")(x)
+        x = self.conv3d_padded(64, 32, 5, 1, self.size // 2, self.size // 2, "conv8_1")(x)
+        x = self.conv3d_padded(32, 32, 5, 1, self.size // 2, self.size // 2, "conv8_2")(x)
         x = tile_add(a, x)
         return x
 
     def conv9(self, x, cat):
-        # a = x.clone()
+        a = x.clone()
         x = concat(x, cat)
-        x = self.conv3d_padded(32, 16, 5, 1, (128, 128, 64), (128, 128, 68), "conv9_1")(x)
-        # x = tile_add(a, x)
+        x = self.conv3d_padded(32, 16, 5, 1, self.size, self.size, "conv9_1")(x)
+        x = tile_add(a, x)
         return x
 
     def forward(self, x):
@@ -166,10 +192,6 @@ class VNet(nn.Module):
         # -> (32, 128, 128, 64)
         # (32, 128, 128, 64) -> (16, 128, 128, 68)
         x = self.prelu9(self.conv9(x, x1))
-
-        # x = x.view(-1, num_flat_features(x)) # flatten for fc
-        # x = F.PReLU(self.fc1(x)) # (16 * 128 * 128 * 68) -> (1 * 128 * 128 * 68)
-        # x = self.fc2(x) # (1 * 128 * 128 * 68) -> (1 * 12 * 128 * 68)
 
         x = self.conv10(x) #(16, 128, 128, 68) -> (1, 128, 128, 68)
         return x
