@@ -8,15 +8,15 @@ from torchvision import transforms
 import time
 
 def compute_loss(dataset, criterion):
-    running_loss = 0.0
-    for example in dataset:
+    avg = 0.0
+    for i, example in enumerate(dataset):
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
         image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
         # label = label.view(-1, num_flat_features(label))
         output = net(image)
-        running_loss += criterion(output, label).data[0]
-    return running_loss / len(dataset)
+        avg += (criterion(output, label).data[0] - avg) / (i + 1)
+    return avg
 
 num_epochs = 1
 display_every_i = 10
@@ -38,7 +38,7 @@ losses = []
 print('Beginning Training...')
 for epoch in range(num_epochs):
 
-    running_loss = 0.0
+    train_loss = 0.0
     for i, example in enumerate(train):
         start_time = time.time()
 
@@ -51,17 +51,18 @@ for epoch in range(num_epochs):
 
         output = net(image)
         loss = criterion(output, label)
+        print(loss.data[0])
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.data[0]
+        train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
         if i % display_every_i == display_every_i - 1:
             test_loss = compute_loss(test, criterion)
-            train_loss = running_loss / display_every_i
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                   (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-            running_loss = 0.0
             losses.append([train_loss, test_loss])
+            
+            train_loss = 0.0
 
 torch.save(net.state_dict(), 'output/model.pth')
 np.save(np.array(losses), 'output/loss.npy')
