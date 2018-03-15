@@ -33,7 +33,7 @@ class GenericFilenames:
     
     def __iter__(self):
         i = 0
-        while i < self.size:
+        while i < len(self):
             yield self[i]
             i += 1
 
@@ -57,7 +57,7 @@ class MotionCorrDataset(Dataset):
     
     def __iter__(self):
         i = 0
-        while i < self.size:
+        while i < len(self):
             yield self[i]
             i += 1
 
