@@ -32,7 +32,7 @@ test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 net = VNet(size)
 criterion = torch.nn.MSELoss()
-optimizer = optim.SGD(net.parameters(), lr = 0.001, momentum = 0.9)
+optimizer = optim.Adam(net.parameters())
 
 losses = []
 print('Beginning Training...')
