@@ -12,6 +12,7 @@ def compute_loss(dataset, criterion):
     for example in dataset:
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
+        image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
         # label = label.view(-1, num_flat_features(label))
         output = net(image)
         running_loss += criterion(output, label).data[0]
