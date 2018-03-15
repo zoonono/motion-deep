@@ -54,6 +54,12 @@ class MotionCorrDataset(Dataset):
         if self.transform:
             sample = self.transform(sample)
         return sample
+    
+    def __iter__(self):
+        i = 0
+        while i < self.size:
+            yield self[i]
+            i += 1
 
 class Decimate(object):
     """Undersample each axis by some factor."""
