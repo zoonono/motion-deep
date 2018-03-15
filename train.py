@@ -6,6 +6,7 @@ from model import VNet
 from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose4D, Decimate
 from torchvision import transforms
 import time
+import os
 
 def compute_loss(dataset, criterion):
     avg = 0.0
@@ -18,8 +19,8 @@ def compute_loss(dataset, criterion):
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
 
-num_epochs = 1
-display_every_i = 10
+num_epochs = 3
+display_every_i = 42
 size = np.array((128, 128, 68))
 
 # Assumes images start as H x W x D x C
@@ -35,10 +36,15 @@ criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
 losses = []
+train_loss, test_loss = 0.0, 0.0
+save_dir = 'output/'
+if not(os.path.exists(save_dir)):
+    os.mkdir(save_dir)
+    
 print('Beginning Training...')
 for epoch in range(num_epochs):
 
-    train_loss = 0.0
+    # train_loss = 0.0
     for i, example in enumerate(train):
         start_time = time.time()
 
@@ -50,20 +56,20 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
 
         output = net(image)
-        loss = criterion(output, label)
-        print(loss.data[0])
+        loss = criterion(output, label)     
         loss.backward()
         optimizer.step()
-
-        train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
-        if i % display_every_i == display_every_i - 1:
+        
+        train_loss = loss.data[0]
+        # train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
+        if i % display_every_i == 0:
             test_loss = compute_loss(test, criterion)
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                   (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-            losses.append([train_loss, test_loss])
-            
-            train_loss = 0.0
-
-torch.save(net.state_dict(), 'output/model.pth')
-np.save(np.array(losses), 'output/loss.npy')
+            # train_loss = 0.0
+        else:
+            print(train_loss, time.time() - start_time)
+        losses.append([train_loss, test_loss])
+    torch.save(net.state_dict(), save_dir + 'model.pth')
+    np.save(save_dir + 'loss.npy', np.array(losses))
 print('Finished Training')
