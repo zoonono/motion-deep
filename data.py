@@ -30,6 +30,12 @@ class GenericFilenames:
                     self.label, self.ext, int(self.size * p), offset = offset))
             offset += int(self.size * p)
         return splitted_filenames
+    
+    def __iter__(self):
+        i = 0
+        while i < self.size:
+            yield self[i]
+            i += 1
 
 class MotionCorrDataset(Dataset):
     def __init__(self, filenames, load_func, transform = None):
