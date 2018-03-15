@@ -98,7 +98,31 @@ class VNet(nn.Module):
             self.add_module(name, conv)
             self.conv_dict[name] = conv
         return self.conv_dict[name]
-
+    
+    def load_state_dict(self, state_dict):
+        self.conv3d_padded(1, 16, 5, 1, self.size, self.size, "conv1_1")
+        self.conv3d_padded(16, 32, 5, 1, self.size // 2, self.size // 2, "conv2_1")
+        self.conv3d_padded(32, 32, 5, 1, self.size // 2, self.size // 2, "conv2_2")
+        self.conv3d_padded(32, 64, 5, 1, self.size // 4, self.size // 4, "conv3_1")
+        self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv3_2")
+        self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv3_3")
+        self.conv3d_padded(64, 128, 5, 1, self.size // 8, self.size // 8, "conv4_1")
+        self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv4_2")
+        self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv4_3")
+        self.conv3d_padded(128, 256, 5, 1, self.size // 16, self.size // 16, "conv5_1")
+        self.conv3d_padded(256, 256, 5, 1, self.size // 16, self.size // 16, "conv5_2")
+        self.conv3d_padded(256, 256, 5, 1, self.size // 16, self.size // 16, "conv5_3")
+        self.conv3d_padded(256, 128, 5, 1, self.size // 8, self.size // 8, "conv6_1")
+        self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv6_2")
+        self.conv3d_padded(128, 128, 5, 1, self.size // 8, self.size // 8, "conv6_3")
+        self.conv3d_padded(128, 64, 5, 1, self.size // 4, self.size // 4, "conv7_1")
+        self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv7_2")
+        self.conv3d_padded(64, 64, 5, 1, self.size // 4, self.size // 4, "conv7_3")
+        self.conv3d_padded(64, 32, 5, 1, self.size // 2, self.size // 2, "conv8_1")
+        self.conv3d_padded(32, 32, 5, 1, self.size // 2, self.size // 2, "conv8_2")
+        self.conv3d_padded(32, 16, 5, 1, self.size, self.size, "conv9_1")
+        super(VNet, self).load_state_dict(state_dict)
+    
     def conv1(self, x):
         a = x.clone()
         x = self.conv3d_padded(1, 16, 5, 1, self.size, self.size, "conv1_1")(x)
