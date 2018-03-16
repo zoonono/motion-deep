@@ -92,6 +92,15 @@ class ToTensor(object):
         return {'image': torch.from_numpy(image.copy()).float(),
                 'label': torch.from_numpy(label.copy()).float()}
 
+class TransposeBack(object):
+    """B x C x H x W x D -> H x W x D"""
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        return {'image': image[0,0,:,:,:],
+                'label': label}
+                
 class Transpose4D(object):
     """Transpose ndarrays to C X D X H X W."""
 
