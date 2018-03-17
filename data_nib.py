@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from matplotlib import pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 import nibabel as nib
 from torchvision import transforms

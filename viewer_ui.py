@@ -31,12 +31,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.load_image(self.spinBox_2.value())
         
-        self.slices = self.pred.shape[1]
+        self.slices = self.corrupt.shape[2]
         self.examples = len(self.test_dataset)
         self.spinBox.setMinimum(0)
         self.spinBox_2.setMinimum(0)
-        self.spinBox.setMaximum(self.slices)
-        self.spinBox_2.setMaximum(self.examples)
+        self.spinBox.setMaximum(self.slices - 1)
+        self.spinBox_2.setMaximum(self.examples - 1)
         
         dimensions = (781, 511)
         dpi = 0.95
@@ -61,12 +61,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     
     def imshow(self, figure, img):
         i = figure.imshow(img, interpolation = 'nearest', cmap = 'gray', origin = 'lower')
-        i.set_clim(np.min(img), np.max(img))
+        # i.set_clim(np.min(img), np.max(img))
+        i.set_clim(np.min(self.corrupt), np.max(self.corrupt))
         return i
         
     def set_data(self, i, img):
         i.set_data(img)
-        i.set_clim(np.min(img), np.max(img))
+        # i.set_clim(np.min(img), np.max(img))
     
     def draw_figure(self, slice, new_image = False):
         corrupt = self.corrupt[:,:,slice]
