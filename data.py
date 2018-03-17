@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from scipy.signal import decimate
 import time
+from random import shuffle
 
 class GenericFilenames:
     def __init__(self, stem, image, label, ext, size, offset = 0):
@@ -45,9 +46,9 @@ class MotionCorrDataset(Dataset):
 
     def __len__(self):
         return (len(self.filenames))
-
-    def __getitem__(self, i):
-        x_path, y_path = self.filenames[i]
+    
+    def load(self, filename):
+        x_path, y_path = filename
         x = self.load_func(x_path)
         y = self.load_func(y_path)
         sample = {'image': x, 'label': y}
@@ -55,11 +56,15 @@ class MotionCorrDataset(Dataset):
             sample = self.transform(sample)
         return sample
     
+    def __getitem__(self, i):
+        return self.load(self.filenames[i])
+    
     def __iter__(self):
-        i = 0
-        while i < len(self):
-            yield self[i]
-            i += 1
+        for filename in self.filenames:
+            yield self.load(filename)
+    
+    def shuffle(self):
+        self.filenames = shuffle(list(self.filenames))
 
 class Decimate(object):
     """Undersample each axis by some factor."""
@@ -101,14 +106,49 @@ class TransposeBack(object):
         return {'image': image[0,0,:,:,:],
                 'label': label}
                 
-class Transpose4D(object):
-    """Transpose ndarrays to C X D X H X W."""
+class BatchDim(object):
+    """C x H x W x D -> B x C x H x W x D 
+    or C x H x W -> B x C x H x W
+    """
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        
+        dims = len(image.shape)
+        if dims == 3:
+            dict = {'image': image[None,:,:,:],
+                    'label': label[None,:,:,:]}
+        elif dims == 4:
+            dict = {'image': image[None,:,:,:,:],
+                    'label': label[None,:,:,:,:]}
+        else:
+            assert False, "Image must be 3d or 4d, but it is " + dims + "d"
+        return dict
+
+class Transpose2d(object):
+    """Transpose ndarrays to C x H x W."""
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
 
-        # numpy image: H x W x D X C
-        # torch image: C X H X W X D
+        # numpy image: H x W x C
+        # torch image: C x H x W
+        if len(image.shape) == 2:
+            image = image[:,:,None]
+            label = label[:,:,None]
+        image = image.transpose((2, 0, 1))
+        label = label.transpose((2, 0, 1))
+        return {'image': image,
+                'label': label}
+        
+class Transpose3d(object):
+    """Transpose ndarrays to C x D x H x W."""
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        # numpy image: H x W x D x C
+        # torch image: C x H x W x D
         if len(image.shape) == 3:
             image = image[:,:,:,None]
             label = label[:,:,:,None]

@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 from model import VNet
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose4D, Decimate
+from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose3d, Decimate
 from torchvision import transforms
 import time
 import os
@@ -10,7 +10,7 @@ import os
 size = np.array((128, 128, 68))
 
 # Assumes images start as H x W x D x C
-t = transforms.Compose([Transpose4D(), ToTensor()])
+t = transforms.Compose([Transpose3d(), ToTensor()])
 filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128)
 train_filenames, test_filenames = filenames.split((0.78125, 0.21875))

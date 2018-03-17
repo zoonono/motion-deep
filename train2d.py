@@ -2,8 +2,8 @@ import torch
 from torch.autograd import Variable
 import torch.optim as optim
 import numpy as np
-from model import VNet
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose3d, Decimate
+from model import VNet2d
+from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate
 from torchvision import transforms
 import time
 import os
@@ -21,17 +21,17 @@ def compute_loss(dataset, criterion):
 
 num_epochs = 3
 display_every_i = 42
-size = np.array((128, 128, 68))
+size = np.array((128, 128))
 
-# Assumes images start as H x W x D, C = 1
-t = transforms.Compose([Transpose3d(), BatchDim(), ToTensor()])
-filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
+# Assumes images start as H x W, C = 1
+t = transforms.Compose([Transpose2d(), BatchDim(), ToTensor()])
+filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128)
 train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
-net = VNet(size)
+net = VNet2d(size)
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
@@ -46,6 +46,7 @@ total_start_time = time.time()
 for epoch in range(num_epochs):
 
     # train_loss = 0.0
+    train.shuffle()
     for i, example in enumerate(train):
         start_time = time.time()
 
@@ -71,6 +72,6 @@ for epoch in range(num_epochs):
         else:
             print(train_loss, time.time() - start_time)
         losses.append([train_loss, test_loss])
-    torch.save(net.state_dict(), save_dir + 'model.pth')
-    np.save(save_dir + 'loss.npy', np.array(losses))
+    torch.save(net.state_dict(), save_dir + 'model2d.pth')
+    np.save(save_dir + 'loss2d.npy', np.array(losses))
 print('Finished Training; Time Elapsed:', total_start_time - time.time())
