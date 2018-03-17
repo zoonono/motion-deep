@@ -74,4 +74,4 @@ for epoch in range(num_epochs):
         losses.append([train_loss, test_loss])
     torch.save(net.state_dict(), save_dir + 'model2d.pth')
     np.save(save_dir + 'loss2d.npy', np.array(losses))
-print('Finished Training; Time Elapsed:', total_start_time - time.time())
+print('Finished Training; Time Elapsed:', time.time() - total_start_time)
