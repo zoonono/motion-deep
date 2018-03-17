@@ -20,7 +20,7 @@ class MotionFilenames:
 
     def __getitem__(self, i):
         x_path = self.stem + self.numbers[i] + self.x_post + self.ext
-        y_path = self.stem + self.numbers[i] + self.x_post + self.ext
+        y_path = self.stem + self.numbers[i] + self.y_post + self.ext
         return x_path, y_path
 
 class GenericFilenames:
