@@ -88,6 +88,15 @@ class Decimate(object):
         return {'image': self.downsample(image),
                 'label': self.downsample(label)}
 
+class Residual(object):
+    """Saves the residual (image - label) instead of the label itself."""
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        return {'image': image,
+                'label': image - label}
+                
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
