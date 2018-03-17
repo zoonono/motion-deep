@@ -131,7 +131,7 @@ class Transpose4D(object):
 
 def main():
     numbers = ['0' + str(i) for i in range(60, 81) if not i in [64, 71, 72, 75, 78]]
-    filenames = MotionFilenames('motion_data/NC_03_Sub',
+    filenames = MotionFilenames('../motion_data/NC_03_Sub',
                                 numbers, '_dataM', '_data', '.nii')
     load_func = lambda x: nib.load(x).get_data().__array__()
     t = transforms.Compose([Decimate(factor = 2, axes = [0, 1, 2]),
@@ -139,7 +139,7 @@ def main():
     dataset = MotionCorrDataset(filenames, load_func, transform = t)
     # dataloader = DataLoader(dataset, batch_size = 1, shuffle = True)
 
-    out_filenames = GenericFilenames('motion_data_resid/', 'motion_corrupt_',
+    out_filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
                                      'motion_resid_', '.npy', -1)
     start_time = time.time()
     print("Saving examples...")
