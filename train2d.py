@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import torch.optim as optim
 import numpy as np
 from model import VNet2d
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate
+from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate, BatchDim
 from torchvision import transforms
 import time
 import os

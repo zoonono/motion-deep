@@ -40,7 +40,7 @@ class GenericFilenames:
 
 class MotionCorrDataset(Dataset):
     def __init__(self, filenames, load_func, transform = None):
-        self.filenames = filenames
+        self.filenames = list(filenames)
         self.load_func = load_func
         self.transform = transform
 
@@ -64,7 +64,7 @@ class MotionCorrDataset(Dataset):
             yield self.load(filename)
     
     def shuffle(self):
-        self.filenames = shuffle(list(self.filenames))
+        shuffle(self.filenames)
 
 class Decimate(object):
     """Undersample each axis by some factor."""

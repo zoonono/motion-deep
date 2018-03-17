@@ -26,18 +26,20 @@ def pad_out_t_full(d_in, d_out, kernel, stride):
                   for i in range(len(d_in))])
 
 def concat(a, b):
-    """Assumes a and b are B x C x H x W x D.
+    """Assumes a and b are B x C x H x W x D or B x C x H x W.
     """
     return torch.cat((a, b), 1)
 
 def tile_add(x, y):
-    """Assumes x and y are B x C x H x W x D. Adds x and y elementwise by tiling
+    """Assumes x and y are B x C x H x W x D or B x C x H x W. Adds x and y elementwise by tiling
     the smaller along the C dimension. H, W, and D must be the same and C_x
     must be a multiple of C_y (or the other way around).
     """
     if x.shape[1] > y.shape[1]:
         x, y = y, x
     ratio = y.shape[1] // x.shape[1]
+    if len(x.shape) == 4:
+        return x.repeat(1, ratio, 1, 1) + y
     return x.repeat(1, ratio, 1, 1, 1) + y
 
 def num_flat_features(self, x):
@@ -81,7 +83,7 @@ class VNet(nn.Module):
         self.prelu5 = nn.PReLU(num_parameters = 128)
         self.prelu9 = nn.PReLU(num_parameters = 16)
 
-        self.conv10 = self.conv3d_padded(16, 1, 1, 1, (128, 128, 68), (128, 128, 68), "conv10_1")
+        self.conv10 = self.conv3d_padded(16, 1, 1, 1, self.size, self.size, "conv10_1")
 
     def conv3d_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
         if not name in self.conv_dict:
@@ -225,7 +227,7 @@ class VNet2d(nn.Module):
     cat and tileadd should still work since C is still dim 1
     """
     def __init__(self, size):
-        super(VNet, self).__init__()
+        super(VNet2d, self).__init__()
         self.size = np.array(size)
 
         self.conv_dict = {}
@@ -255,7 +257,7 @@ class VNet2d(nn.Module):
         self.prelu5 = nn.PReLU(num_parameters = 128)
         self.prelu9 = nn.PReLU(num_parameters = 16)
 
-        self.conv10 = self.conv2d_padded(16, 1, 1, 1, (128, 128, 68), (128, 128, 68), "conv10_1")
+        self.conv10 = self.conv2d_padded(16, 1, 1, 1, self.size, self.size, "conv10_1")
 
     def conv2d_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
         if not name in self.conv_dict:
