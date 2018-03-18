@@ -134,6 +134,63 @@ class BatchDim(object):
             assert False, "Image must be 3d or 4d, but it is " + dims + "d"
         return dict
 
+class DepthDim(object):
+    """H x W -> H x W x D,
+    C x H x W -> C x H x W x D
+    """
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        
+        dims = len(image.shape)
+        if dims == 2:
+            dict = {'image': image[:,:,None],
+                    'label': label}
+        elif dims == 3:
+            dict = {'image': image[:,:,:,None],
+                    'label': label}
+        else:
+            assert False, "Image must be 2d or 3d, but it is " + dims + "d"
+        return dict
+        
+class DepthDim2(object):
+    """H x W -> H x W x D,
+    C x H x W -> C x H x W x D
+    """
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        
+        dims = len(image.shape)
+        if dims == 2:
+            dict = {'image': image[:,:,None],
+                    'label': label[:,:,None]}
+        elif dims == 3:
+            dict = {'image': image[:,:,:,None],
+                    'label': label[:,:,None]}
+        else:
+            assert False, "Image must be 2d or 3d, but it is " + dims + "d"
+        return dict
+        
+class RemoveDim(object):
+    """C x H x W x D <- B x C x H x W x D 
+    or C x H x W <- B x C x H x W
+    """
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        
+        dims = len(image.shape)
+        if dims == 3:
+            dict = {'image': image[0,:,:],
+                    'label': label}
+        elif dims == 4:
+            dict = {'image': image[0,:,:,:],
+                    'label': label}
+        else:
+            assert False, "Image must be 3d or 4d, but it is " + dims + "d"
+        return dict
+        
 class Transpose2d(object):
     """Transpose ndarrays to C x H x W."""
 

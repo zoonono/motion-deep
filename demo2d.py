@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Variable
 import numpy as np
-from model import VNet2d
+from model import VNet2d, DnCnn
 from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate, BatchDim
 from torchvision import transforms
 import time
@@ -18,12 +18,13 @@ test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 criterion = torch.nn.MSELoss()
 
-net = VNet2d(size)
+# net = VNet2d(size)
+net = DnCnn(size, 20)
 save_dir = 'output/'
-net.load_state_dict(torch.load(save_dir + 'model2d.pth'))
+net.load_state_dict(torch.load(save_dir + 'modelDnCnn.pth'))
 
-save_filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_pred_loss_',
-                             'motion_pred_', '.npy', 8704)
+save_filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_pred_loss_dn_',
+                             'motion_pred_dn_', '.npy', 8704)
 train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
 
 print("Generating test example predictions...")
