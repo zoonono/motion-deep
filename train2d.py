@@ -20,14 +20,15 @@ def compute_loss(dataset, criterion):
     return avg
 
 num_epochs = 3
-display_every_i = 42
+display_every_i = 2500
+display_every_i_2 = 500
 size = np.array((128, 128))
 
 # Assumes images start as H x W, C = 1
 t = transforms.Compose([Transpose2d(), BatchDim(), ToTensor()])
 filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
-                             'motion_resid_', '.npy', 128)
-train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
+                             'motion_resid_', '.npy', 8704)
+train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
@@ -69,7 +70,7 @@ for epoch in range(num_epochs):
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                   (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
             # train_loss = 0.0
-        else:
+        elif i % display_every_i_2 == 0:
             print(train_loss, time.time() - start_time)
         losses.append([train_loss, test_loss])
     torch.save(net.state_dict(), save_dir + 'model2d.pth')
