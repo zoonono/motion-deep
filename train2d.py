@@ -33,7 +33,7 @@ train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 # net = VNet2d(size)
-net = DnCnn(size, 50) # (2d + 1) is the receptive field
+net = DnCnn(size, 20) # (2d + 1) is the receptive field
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
