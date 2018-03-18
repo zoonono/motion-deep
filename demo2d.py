@@ -1,30 +1,30 @@
 import torch
 from torch.autograd import Variable
 import numpy as np
-from model import VNet
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose3d, Decimate, BatchDim
+from model import VNet2d
+from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate, BatchDim
 from torchvision import transforms
 import time
 import os
 
-size = np.array((128, 128, 68))
+size = np.array((128, 128))
 
 # Assumes images start as H x W x D x C
-t = transforms.Compose([Transpose3d(), BatchDim(), ToTensor()])
-filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
-                             'motion_resid_', '.npy', 128)
-train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
+t = transforms.Compose([Transpose2d(), BatchDim(), ToTensor()])
+filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
+                             'motion_resid_', '.npy', 8704)
+train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 criterion = torch.nn.MSELoss()
 
-net = VNet(size)
+net = VNet2d(size)
 save_dir = 'output/'
-net.load_state_dict(torch.load(save_dir + 'model.pth'))
+net.load_state_dict(torch.load(save_dir + 'model2d.pth'))
 
-save_filenames = GenericFilenames('../motion_data_resid/', 'motion_pred_loss_',
-                             'motion_pred_', '.npy', 128)
-train_save_filenames, test_save_filenames = save_filenames.split((0.78125, 0.21875))
+save_filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_pred_loss_',
+                             'motion_pred_', '.npy', 8704)
+train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
 
 print("Generating test example predictions...")
 start_time = time.time()

@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 import torch.optim as optim
 import numpy as np
-from model import VNet2d
+from model import VNet2d, DnCnn
 from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose2d, Decimate, BatchDim
 from torchvision import transforms
 import time
@@ -19,7 +19,7 @@ def compute_loss(dataset, criterion):
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
 
-num_epochs = 3
+num_epochs = 10
 display_every_i = 2500
 display_every_i_2 = 500
 size = np.array((128, 128))
@@ -32,7 +32,8 @@ train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
-net = VNet2d(size)
+# net = VNet2d(size)
+net = DnCnn(size, 50) # (2d + 1) is the receptive field
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
@@ -46,7 +47,7 @@ print('Beginning Training...')
 total_start_time = time.time()
 for epoch in range(num_epochs):
 
-    # train_loss = 0.0
+    train_loss = 0.0
     train.shuffle()
     for i, example in enumerate(train):
         start_time = time.time()
@@ -63,16 +64,17 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
         
-        train_loss = loss.data[0]
-        # train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
-        if i % display_every_i == 0:
+        train_loss += (loss.data[0] - train_loss) / (i % display_every_i_2 + 1)
+        if i % display_every_i == display_every_i - 1:
             test_loss = compute_loss(test, criterion)
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                   (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-            # train_loss = 0.0
-        elif i % display_every_i_2 == 0:
+            losses.append([train_loss, test_loss])
+            train_loss = 0.0
+        elif i % display_every_i_2 == display_every_i_2 - 1:
             print(train_loss, time.time() - start_time)
-        losses.append([train_loss, test_loss])
-    torch.save(net.state_dict(), save_dir + 'model2d.pth')
-    np.save(save_dir + 'loss2d.npy', np.array(losses))
+            losses.append([train_loss, test_loss])
+            train_loss = 0.0
+    torch.save(net.state_dict(), save_dir + 'modelDnCnn.pth')
+    np.save(save_dir + 'lossDnCnn.npy', np.array(losses))
 print('Finished Training; Time Elapsed:', time.time() - total_start_time)

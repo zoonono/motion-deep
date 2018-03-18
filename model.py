@@ -297,7 +297,7 @@ class VNet2d(nn.Module):
         self.conv2d_padded(64, 32, 5, 1, self.size // 2, self.size // 2, "conv8_1")
         self.conv2d_padded(32, 32, 5, 1, self.size // 2, self.size // 2, "conv8_2")
         self.conv2d_padded(32, 16, 5, 1, self.size, self.size, "conv9_1")
-        super(VNet, self).load_state_dict(state_dict)
+        super(VNet2d, self).load_state_dict(state_dict)
     
     def conv1(self, x):
         a = x.clone()
@@ -394,4 +394,54 @@ class VNet2d(nn.Module):
         x = self.prelu9(self.conv9(x, x1))
 
         x = self.conv10(x) #(16, 128, 128, 68) -> (1, 128, 128, 68)
+        return x
+
+class DnCnn(nn.Module):
+    """V-net, but in 2D
+    cat and tileadd should still work since C is still dim 1
+    """
+    def __init__(self, size, depth):
+        super(DnCnn, self).__init__()
+        self.size = np.array(size)
+        self.depth = depth
+
+        self.conv_dict = {}
+        self.conv1 = self.conv2d_padded(1, 64, 3, 1, size, size, "conv1")
+        self.prelu1 = nn.PReLU(num_parameters = 64)
+        for i in range(self.depth):
+            c_name = "conv" + str(i + 2)
+            b_name = "batch" + str(i + 2)
+            p_name = "prelu" + str(i + 2)
+            setattr(self, c_name, self.conv2d_padded(64, 64, 3, 1, size, size, c_name))
+            setattr(self, b_name, nn.BatchNorm2d(64))
+            setattr(self, p_name, nn.PReLU(num_parameters = 64))
+        self.convf = self.conv2d_padded(64, 1, 3, 1, size, size, "convf")
+
+    def conv2d_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
+        if not name in self.conv_dict:
+            conv = nn.Conv2d(ch_in, ch_out, kernel, stride = stride,
+                padding = pad_full(d_in, d_out, kernel, stride))
+            self.add_module(name, conv)
+            self.conv_dict[name] = conv
+        return self.conv_dict[name]
+
+    def conv2d_t_padded(self, ch_in, ch_out, kernel, stride, d_in, d_out, name):
+        if not name in self.conv_dict:
+            conv = nn.ConvTranspose2d(ch_in, ch_out, kernel, stride = stride,
+                output_padding = pad_out_t_full(d_in, d_out, kernel, stride))
+            self.add_module(name, conv)
+            self.conv_dict[name] = conv
+        return self.conv_dict[name]    
+
+    def forward(self, x):
+        x = self.prelu1(self.conv1(x))
+        for i in range(self.depth):
+            c_name = "conv" + str(i + 2)
+            b_name = "batch" + str(i + 2)
+            p_name = "prelu" + str(i + 2)
+            conv = getattr(self, c_name)
+            batch = getattr(self, b_name)
+            prelu = getattr(self, p_name)
+            x = prelu(batch(x + conv(x))) # x + conv(x) implements residual learning
+        x = self.convf(x)
         return x
