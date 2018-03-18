@@ -19,7 +19,7 @@ def compute_loss(dataset, criterion):
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
 
-num_epochs = 10
+num_epochs = 3
 display_every_i = 2500
 display_every_i_2 = 500
 size = np.array((128, 128))
@@ -75,6 +75,8 @@ for epoch in range(num_epochs):
             print(train_loss, time.time() - start_time)
             losses.append([train_loss, test_loss])
             train_loss = 0.0
+        elif i == 0:
+            print(train_loss, time.time() - start_time)
     torch.save(net.state_dict(), save_dir + 'modelDnCnn.pth')
     np.save(save_dir + 'lossDnCnn.npy', np.array(losses))
 print('Finished Training; Time Elapsed:', time.time() - total_start_time)
