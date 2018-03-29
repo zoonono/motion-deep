@@ -66,6 +66,26 @@ class MotionCorrDataset(Dataset):
     def shuffle(self):
         shuffle(self.filenames)
 
+class Splitter(Dataset):
+    def __init__(self, dataset):
+        self.dataset = dataset # C x H x W x D
+        self.depth = dataset[0]['image'].shape[3]
+        
+    def __len__(self):
+        return len(self.dataset) * self.depth
+        
+    def __getitem__(self, i):
+        i, r = i // depth, i % depth
+        example = self.dataset[i]
+        x, y = example['image'], example['label']
+        return {'image': x[:,:,:,r], 'label': y[:,:,:,r]}
+        
+    def __iter__(self):
+        for example in self.dataset:
+            x, y = example['image'], example['label']
+            for i in self.depth:
+                yield {'image': x[:,:,:,i], 'label': y[:,:,:,i]}
+            
 class Decimate(object):
     """Undersample each axis by some factor."""
     def __init__(self, factor = 2, axes = None):
