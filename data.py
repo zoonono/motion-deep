@@ -138,7 +138,22 @@ class Residual(object):
 
         return {'image': image,
                 'label': image - label}
-                
+
+class RealImag(object):
+    """Splits complex data into real and imag components as channels.
+    H x W x D x E -> C x H x W x D x E
+    """
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        image = np.expand_dims(image, axis = 0)
+        label = np.expand_dims(label, axis = 0)
+        image = np.concatenate((np.real(image), np.imag(image)), axis = 0)
+        label = np.concatenate((np.real(label), np.imag(label)), axis = 0)
+
+        return {'image': image,
+                'label': label}                
+            
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
