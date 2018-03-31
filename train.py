@@ -9,15 +9,16 @@ import time
 import os
 
 exp_name = 'patch1'
-num_epochs = 3
-test_every_i = 42 # epoch size is 128, test 3 times per epoch
-size = np.array((64,64,64)) # originally (256, 256, 136), but patched
+num_epochs = 10
+test_every_i = 60 # epoch size is 128, test 3 times per epoch
+batch_size = 10
+size = np.array((32,32,32)) # originally (256, 256, 136), but patched
 in_ch = 2 # 2 channels: real, imag
-t = transforms.Compose([Patcher((64,64,64)), ToTensor()])
+t = transforms.Compose([Patcher((32,32,32)), ToTensor()])
 
 net = VNet(size, in_ch = in_ch)
 criterion = torch.nn.MSELoss()
-optimizer = optim.Adam(net.parameters(), lr = 0.0001)
+optimizer = optim.Adam(net.parameters(), lr = 0.001)
 
 def compute_loss(dataset, criterion):
     avg = 0.0
@@ -47,30 +48,40 @@ for epoch in range(num_epochs):
 
     train_loss = 0.0
     train.shuffle()
+    
+    image_batch, label_batch = None, None
     for i, example in enumerate(train):
         start_time = time.time()
 
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
         image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
-
-        optimizer.zero_grad()
-
-        output = net(image)
-        loss = criterion(output, label)     
-        loss.backward()
-        optimizer.step()
         
-        # train_loss is a moving avg, so it lags behind test_loss
-        train_loss += (loss.data[0] - train_loss) / (i % test_every_i + 1)
-        if i % test_every_i == test_every_i - 1:
-            test_loss = compute_loss(test, criterion)
-            print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
-                  (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-            losses.append([train_loss, test_loss])
-            train_loss = 0.0
+        if image_batch is None:
+            image_batch, label_batch = image, label
         else:
-            print(train_loss, time.time() - start_time)
+            image_batch = torch.cat((image_batch, image), 0)
+            label_batch = torch.cat((label_batch, label), 0)
+        if i % batch_size == batch_size - 1:
+            optimizer.zero_grad()
+
+            output = net(image_batch)
+            loss = criterion(output, label_batch)     
+            loss.backward()
+            optimizer.step()
+            
+            image_batch, label_batch = None, None
+            
+            # train_loss is a moving avg, so it lags behind test_loss
+            train_loss += (loss.data[0] - train_loss) / (i % test_every_i + 1)
+            if i % test_every_i == test_every_i - 1:
+                test_loss = compute_loss(test, criterion)
+                print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
+                      (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
+                losses.append([train_loss, test_loss])
+                train_loss = 0.0
+            else:
+                print(train_loss, time.time() - start_time)
     torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
     np.save(save_dir + 'loss_' + exp_name + '.npy', np.array(losses))
 print('Finished Training; Time Elapsed:', total_start_time - time.time())
