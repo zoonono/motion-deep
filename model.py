@@ -50,6 +50,7 @@ def num_flat_features(self, x):
     return num_features
 
 def conv_padded(ch_in, ch_out, kernel, stride, d_in, d_out, dim = '2d'):
+    d_in, d_out = d_in.astype(int), d_out.astype(int)
     if dim == '2d':
         conv_f = nn.Conv2d
     elif dim == '3d':
@@ -58,6 +59,7 @@ def conv_padded(ch_in, ch_out, kernel, stride, d_in, d_out, dim = '2d'):
                   padding = pad_full(d_in, d_out, kernel, stride))
 
 def conv_t_padded(ch_in, ch_out, kernel, stride, d_in, d_out, dim = '2d'):
+    d_in, d_out = d_in.astype(int), d_out.astype(int)
     if dim == '2d':
         conv_f = nn.ConvTranspose2d
     elif dim == '3d':
@@ -105,7 +107,7 @@ class VNet(nn.Module):
         Minimum size = size // (2 ** depth)
         """
         super(VNet, self).__init__()
-        size = np.array(size)
+        size = np.array(size, dtype = np.float32)
         self.size = size
         self.dim = dim
         self.depth = depth
@@ -114,14 +116,14 @@ class VNet(nn.Module):
         ch = start_ch
         
         self.conv0 = self.resid_conv_down(in_ch, ch, size, 1, "conv0")
-        self.downconv0 = conv_padded(ch, ch, 2, 2, size, size // 2, dim = self.dim)
-        size //= 2
+        self.downconv0 = conv_padded(ch, ch, 2, 2, size, size / 2, dim = self.dim)
+        size /= 2
         self.prelu0 = nn.PReLU(num_parameters = ch)
         for i in range(1, depth): # down
             setattr(self, "dconv" + str(i), self.resid_conv_down(ch, ch * 2, size, 3, "dconv" + str(i)))
             ch *= 2
-            setattr(self, "down" + str(i), conv_padded(ch, ch, 2, 2, size, size // 2, dim = self.dim))
-            size //= 2
+            setattr(self, "down" + str(i), conv_padded(ch, ch, 2, 2, size, size / 2, dim = self.dim))
+            size /= 2
             setattr(self, "dprelu" + str(i), nn.PReLU(num_parameters = ch))
         # middle
         setattr(self, "mconv", self.resid_conv_down(ch, ch * 2, size, 3, "mconv"))
@@ -144,6 +146,7 @@ class VNet(nn.Module):
     def resid_conv_down(self, in_ch, out_ch, size, depth, name):
         """Adds necessary modules for one layer and returns a callable function.
         """
+        size = size.astype(int)
         if self.verbose:
             print(size, in_ch, out_ch, name)
         setattr(self, name + "_0", conv_padded(in_ch, out_ch, 5, 1, size, size, dim = self.dim))
@@ -161,6 +164,7 @@ class VNet(nn.Module):
     def resid_conv_up(self, in_ch, out_ch, size, depth, name):
         """Adds necessary modules for one layer with feature forwarding and returns a callable function.
         """
+        size = size.astype(int)
         if self.verbose:
             print(size, in_ch, out_ch, name)
         setattr(self, name + "_0", conv_padded(in_ch * 2, out_ch, 5, 1, size, size, dim = self.dim))

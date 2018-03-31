@@ -126,118 +126,56 @@ class ToTensor(object):
         return {'image': torch.from_numpy(image.copy()).float(),
                 'label': torch.from_numpy(label.copy()).float()}
 
-class TransposeBack(object):
-    """B x C x H x W x D -> H x W x D"""
-
+class RemoveDims(object):
+    """Removes singleton dimensions.
+    """
+    
+    def __init__(self, axes = None, both = False):
+        self.axes = axes
+        self.both = both
+        
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
-
-        return {'image': image[0,0,:,:,:],
+        
+        image = np.squeeze(image, axis = self.axes)
+        if self.both:
+            label = np.squeeze(label, axis = self.axes)
+        return {'image': image,
                 'label': label}
                 
-class BatchDim(object):
-    """C x H x W x D -> B x C x H x W x D 
-    or C x H x W -> B x C x H x W
+class FrontDim(object):
+    """Adds a singleton dimension at the front of a numpy array.
     """
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
+        image = np.expand_dims(image, axis = 0)
+        label = np.expand_dims(label, axis = 0)
         
-        dims = len(image.shape)
-        if dims == 3:
-            dict = {'image': image[None,:,:,:],
-                    'label': label[None,:,:,:]}
-        elif dims == 4:
-            dict = {'image': image[None,:,:,:,:],
-                    'label': label[None,:,:,:,:]}
-        else:
-            assert False, "Image must be 3d or 4d, but it is " + dims + "d"
-        return dict
+        return {'image': image,
+                'label': label}
 
-class DepthDim(object):
-    """H x W -> H x W x D,
-    C x H x W -> C x H x W x D
+class BackDim(object):
+    """Adds a singleton dimension at the end of a numpy array.
     """
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
+        image = np.expand_dims(image, axis = len(image.shape))
+        label = np.expand_dims(label, axis = len(label.shape))
         
-        dims = len(image.shape)
-        if dims == 2:
-            dict = {'image': image[:,:,None],
-                    'label': label}
-        elif dims == 3:
-            dict = {'image': image[:,:,:,None],
-                    'label': label}
-        else:
-            assert False, "Image must be 2d or 3d, but it is " + dims + "d"
-        return dict
-        
-class DepthDim2(object):
-    """H x W -> H x W x D,
-    C x H x W -> C x H x W x D
-    """
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        
-        dims = len(image.shape)
-        if dims == 2:
-            dict = {'image': image[:,:,None],
-                    'label': label[:,:,None]}
-        elif dims == 3:
-            dict = {'image': image[:,:,:,None],
-                    'label': label[:,:,None]}
-        else:
-            assert False, "Image must be 2d or 3d, but it is " + dims + "d"
-        return dict
-        
-class RemoveDim(object):
-    """C x H x W x D <- B x C x H x W x D 
-    or C x H x W <- B x C x H x W
-    """
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        
-        dims = len(image.shape)
-        if dims == 3:
-            dict = {'image': image[0,:,:],
-                    'label': label}
-        elif dims == 4:
-            dict = {'image': image[0,:,:,:],
-                    'label': label}
-        else:
-            assert False, "Image must be 3d or 4d, but it is " + dims + "d"
-        return dict
-        
-class Transpose2d(object):
-    """Transpose ndarrays to C x H x W."""
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        # numpy image: H x W x C
-        # torch image: C x H x W
-        if len(image.shape) == 2:
-            image = image[:,:,None]
-            label = label[:,:,None]
-        image = image.transpose((2, 0, 1))
-        label = label.transpose((2, 0, 1))
         return {'image': image,
                 'label': label}
         
 class Transpose3d(object):
-    """Transpose ndarrays to C x D x H x W."""
+    """Transpose D x H x W x C to C x D x H x W.
+    """
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
 
         # numpy image: H x W x D x C
         # torch image: C x H x W x D
-        if len(image.shape) == 3:
-            image = image[:,:,:,None]
-            label = label[:,:,:,None]
         image = image.transpose((3, 0, 1, 2))
         label = label.transpose((3, 0, 1, 2))
         return {'image': image,
