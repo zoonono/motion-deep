@@ -92,21 +92,26 @@ class Splitter(Dataset):
             x, y = example['image'], example['label']
             for d in range(self.depth):
                 yield {'image': x[d], 'label': y[d]}
+    
+    def shuffle(self):
+        if hasattr(self.dataset, shuffle):
+            self.dataset.shuffle()
 
 class Patcher(object):
     """Randomly crops 3D images into patches of the given size.
+    Assumes input is C x H x W x D, patch_size is H x W x D.
     """
-    def __init__(self, dataset, patch_size):
-        self.dataset = dataset # C x H x W x D
+    def __init__(self, patch_size):
         self.patch_size = patch_size
         
     def __call__(self, sample):
         x, y = sample['image'], sample['label']
-        h = np.random.randint(0, x.shape[1] - patch_size[1])
-        w = np.random.randint(0, x.shape[2] - patch_size[2])
-        d = np.random.randint(0, x.shape[3] - patch_size[3])
-        return {'image': x[:,h:h+patch_size[1],w:w+patch_size[2],d:d+patch_size[3]], 
-                'label': y[:,h:h+patch_size[1],w:w+patch_size[2],d:d+patch_size[3]]}
+        p_h, p_w, p_d = self.patch_size
+        h = np.random.randint(0, x.shape[1] - p_h)
+        w = np.random.randint(0, x.shape[2] - p_w)
+        d = np.random.randint(0, x.shape[3] - p_d)
+        return {'image': x[:,h:h+p_h,w:w+p_w,d:d+p_d], 
+                'label': y[:,h:h+p_h,w:w+p_w,d:d+p_d]}
             
 class Decimate(object):
     """Undersample each axis by some factor."""

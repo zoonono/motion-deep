@@ -102,14 +102,17 @@ class DnCnn(nn.Module):
 class VNet(nn.Module):
     """V-net architecture: https://arxiv.org/abs/1606.04797
     """
-    def __init__(self, size, depth = 5, dim = '2d', in_ch = 1, start_ch = 16, verbose = False):
+    def __init__(self, size, depth = 5, in_ch = 1, start_ch = 16, verbose = False):
         """ Initializes layers for VNet.
         Minimum size = size // (2 ** depth)
         """
         super(VNet, self).__init__()
         size = np.array(size, dtype = np.float32)
         self.size = size
-        self.dim = dim
+        if len(size) == 2:
+            self.dim = '2d'
+        else:
+            self.dim = '3d'
         self.depth = depth
         self.verbose = verbose
         

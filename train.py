@@ -2,36 +2,36 @@ import torch
 from torch.autograd import Variable
 import torch.optim as optim
 import numpy as np
-from model import VNet
-from data import GenericFilenames, MotionCorrDataset, ToTensor, Transpose3d, Decimate
+from model import VNet, DnCnn
+from data import *
 from torchvision import transforms
 import time
 import os
+
+exp_name = 'patch1'
+num_epochs = 3
+test_every_i = 42 # epoch size is 128, test 3 times per epoch
+size = np.array((64,64,64)) # originally (256, 256, 136), but patched
+in_ch = 2 # 2 channels: real, imag
+t = transforms.Compose([Patcher((64,64,64)), ToTensor()])
+net = VNet(size, in_ch = in_ch)
 
 def compute_loss(dataset, criterion):
     avg = 0.0
     for i, example in enumerate(dataset):
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
-        # image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
-        # label = label.view(-1, num_flat_features(label))
+        image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
         output = net(image)
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
 
-num_epochs = 3
-display_every_i = 42
-size = np.array((128, 128, 68))
-
-# Assumes images start as H x W x D, C = 1
-t = transforms.Compose([Transpose3d(), BatchDim(), ToTensor()])
-filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
-                             'motion_resid_', '.npy', 128)
+filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
+                             'motion_resid_', '.npy', 128) # Assumes images start as C x H x W x D
 train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
-net = VNet(size)
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
@@ -45,14 +45,14 @@ print('Beginning Training...')
 total_start_time = time.time()
 for epoch in range(num_epochs):
 
-    # train_loss = 0.0
+    train_loss = 0.0
+    train.shuffle()
     for i, example in enumerate(train):
         start_time = time.time()
 
         image, label = example['image'], example['label']
         image, label = Variable(image), Variable(label)
-        # image, label = image[None,:,:,:,:], label[None,:,:,:,:] # add batch dim
-        # label = label.view(-1, num_flat_features(label))
+        image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
 
         optimizer.zero_grad()
 
@@ -61,16 +61,16 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
         
-        train_loss = loss.data[0]
-        # train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
-        if i % display_every_i == 0:
+        # train_loss is a moving avg, so it lags behind test_loss
+        train_loss += (loss.data[0] - train_loss) / (i % test_every_i + 1)
+        if i % test_every_i == test_every_i - 1:
             test_loss = compute_loss(test, criterion)
             print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                   (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-            # train_loss = 0.0
+            losses.append([train_loss, test_loss])
+            train_loss = 0.0
         else:
             print(train_loss, time.time() - start_time)
-        losses.append([train_loss, test_loss])
-    torch.save(net.state_dict(), save_dir + 'model.pth')
-    np.save(save_dir + 'loss.npy', np.array(losses))
+    torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
+    np.save(save_dir + 'loss_' + exp_name + '.npy', np.array(losses))
 print('Finished Training; Time Elapsed:', total_start_time - time.time())
