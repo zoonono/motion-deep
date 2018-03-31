@@ -33,10 +33,8 @@ class GenericFilenames:
         return splitted_filenames
     
     def __iter__(self):
-        i = 0
-        while i < len(self):
+        for i in range(len(self)):
             yield self[i]
-            i += 1
 
 class MotionCorrDataset(Dataset):
     def __init__(self, filenames, load_func, transform = None):
@@ -67,24 +65,48 @@ class MotionCorrDataset(Dataset):
         shuffle(self.filenames)
 
 class Splitter(Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset # C x H x W x D
-        self.depth = dataset[0]['image'].shape[3]
+    """Splits 3D images into 2D slices by the 4th axis.
+    Assumes images are C x H x W x D, outputs C x H x W.
+    """
+    def __init__(self, dataset, depth = None):
+        self.dataset = dataset
+        if not depth:
+            self.depth = dataset[0].shape[3]
+        else:
+            self.depth = depth
         
     def __len__(self):
-        return len(self.dataset) * self.depth
+        return len(self.dataset)
         
     def __getitem__(self, i):
-        i, r = i // depth, i % depth
+        """Returns the ith item that would be returned by the iterator.
+        Not as efficient because it reads one example file repeatedly for each slice.
+        """
+        i, d = i // self.depth, i % self.depth
         example = self.dataset[i]
         x, y = example['image'], example['label']
-        return {'image': x[:,:,:,r], 'label': y[:,:,:,r]}
+        return {'image': x[d], 'label': y[d]}
         
     def __iter__(self):
         for example in self.dataset:
             x, y = example['image'], example['label']
-            for i in self.depth:
-                yield {'image': x[:,:,:,i], 'label': y[:,:,:,i]}
+            for d in range(self.depth):
+                yield {'image': x[d], 'label': y[d]}
+
+class Patcher(object):
+    """Randomly crops 3D images into patches of the given size.
+    """
+    def __init__(self, dataset, patch_size):
+        self.dataset = dataset # C x H x W x D
+        self.patch_size = patch_size
+        
+    def __call__(self, sample):
+        x, y = sample['image'], sample['label']
+        h = np.random.randint(0, x.shape[1] - patch_size[1])
+        w = np.random.randint(0, x.shape[2] - patch_size[2])
+        d = np.random.randint(0, x.shape[3] - patch_size[3])
+        return {'image': x[:,h:h+patch_size[1],w:w+patch_size[2],d:d+patch_size[3]], 
+                'label': y[:,h:h+patch_size[1],w:w+patch_size[2],d:d+patch_size[3]]}
             
 class Decimate(object):
     """Undersample each axis by some factor."""
@@ -176,7 +198,7 @@ class Transpose3d(object):
 
         # numpy image: H x W x D x C
         # torch image: C x H x W x D
-        image = image.transpose((3, 0, 1, 2))
-        label = label.transpose((3, 0, 1, 2))
+        image = image.transpose(3, 0, 1, 2)
+        label = label.transpose(3, 0, 1, 2)
         return {'image': image,
                 'label': label}
