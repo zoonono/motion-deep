@@ -14,7 +14,10 @@ test_every_i = 42 # epoch size is 128, test 3 times per epoch
 size = np.array((64,64,64)) # originally (256, 256, 136), but patched
 in_ch = 2 # 2 channels: real, imag
 t = transforms.Compose([Patcher((64,64,64)), ToTensor()])
+
 net = VNet(size, in_ch = in_ch)
+criterion = torch.nn.MSELoss()
+optimizer = optim.Adam(net.parameters(), lr = 0.0001)
 
 def compute_loss(dataset, criterion):
     avg = 0.0
@@ -31,9 +34,6 @@ filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
 train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
-
-criterion = torch.nn.MSELoss()
-optimizer = optim.Adam(net.parameters())
 
 losses = []
 train_loss, test_loss = 0.0, 0.0
