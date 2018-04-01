@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from viewer_window import Ui_MainWindow
-from data import MotionCorrDataset, GenericFilenames, TransposeBack, RemoveDim, DepthDim, DepthDim2
+from data import *
 from torchvision import transforms
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -29,6 +29,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.spinBox.valueChanged.connect(lambda x: self.draw_figure(self.spinBox.value()))
         self.spinBox_2.valueChanged.connect(lambda x: self.load_image(self.spinBox_2.value())
                                                    or self.draw_figure(self.spinBox.value()))
+                                                   
+        self.radioButton_axial.toggled.connect(lambda x: self.set_slice_max() 
+                or self.draw_figure(self.spinBox.value(), new_image = True))
+        self.radioButton_sagittal.toggled.connect(lambda x: self.set_slice_max() 
+                or self.draw_figure(self.spinBox.value(), new_image = True))
+        self.radioButton_coronal.toggled.connect(lambda x: self.set_slice_max() 
+                or self.draw_figure(self.spinBox.value(), new_image = True))
         
         self.load_image(self.spinBox_2.value())
         
@@ -72,9 +79,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # i.set_clim(np.min(img), np.max(img))
     
     def draw_figure(self, slice, new_image = False):
-        corrupt = self.corrupt[:,:,slice]
-        truth = self.truth[:,:,slice]
-        pred = self.pred[:,:,slice]
+        if self.radioButton_axial.isChecked():
+            corrupt = self.corrupt[:,:,slice]
+            truth = self.truth[:,:,slice]
+            pred = self.pred[:,:,slice]
+        elif self.radioButton_sagittal.isChecked():
+            corrupt = self.corrupt[slice,:,:]
+            truth = self.truth[slice,:,:]
+            pred = self.pred[slice,:,:]
+        elif self.radioButton_coronal.isChecked():
+            corrupt = self.corrupt[:,slice,:]
+            truth = self.truth[:,slice,:]
+            pred = self.pred[:,slice,:]
         if new_image:
             self.image_truth_corrected = self.imshow(self.figure_truth_corrected, corrupt - truth)
             self.image_pred_corrected = self.imshow(self.figure_pred_corrected, corrupt - pred)
@@ -90,7 +106,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.set_data(self.image_pred, pred)
             self.set_data(self.image_residual, truth - pred)
         self.canvas.draw()
+        
         self.statusBar().showMessage(str(self.loss[0]))
+    
+    def set_slice_max(self):
+        if self.radioButton_axial.isChecked():
+            dim = 2
+        elif self.radioButton_sagittal.isChecked():
+            dim = 0
+        elif self.radioButton_coronal.isChecked():
+            dim = 1
+        self.slices = self.corrupt.shape[dim]
+        self.spinBox.setMaximum(self.slices - 1)
     
     def load_image(self, example):
         test = self.test_dataset[example]
@@ -98,29 +125,32 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.corrupt = test['image'] # H x W x D
         self.truth = test['label'] # H x W x D
         self.pred = pred['image'] # H x W x D
-        self.loss = pred['label'] # 1
+        self.loss = pred['label'] # 1 or D
+        
+        self.set_slice_max()
         
 def main(): 
     a = QtWidgets.QApplication(sys.argv)
     
-    #filenames = GenericFilenames('../motion_data_resid/', 'motion_corrupt_',
-    #                         'motion_resid_', '.npy', 128)
-    #train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
-    #test = MotionCorrDataset(test_filenames, lambda x: np.load(x))
-    filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
-                                 'motion_resid_', '.npy', 8704)
-    train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
-    test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = DepthDim2())
+    # filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
+                                 # 'motion_resid_', '.npy', 8704)
+    # train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
+    # test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = BackDim(both = True))
     
-    #save_filenames = GenericFilenames('../motion_data_resid/', 'motion_pred_',
-    #                         'motion_pred_loss_', '.npy', 128)
-    #train_save_filenames, test_save_filenames = save_filenames.split((0.78125, 0.21875))
-    #pred = MotionCorrDataset(test_save_filenames, lambda x: np.load(x), transform = TransposeBack())
-    save_filenames = GenericFilenames('../dncnn/', 'motion_pred_dn_',
-                             'motion_pred_loss_dn_', '.npy', 8704)
-    train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
-    t = transforms.Compose([RemoveDim(), RemoveDim(), DepthDim()])
-    pred = MotionCorrDataset(test_save_filenames, lambda x: np.load(x), transform = t)
+    # save_filenames = GenericFilenames('../dncnn/', 'motion_pred_dn_',
+                             # 'motion_pred_loss_dn_', '.npy', 8704)
+    # train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
+    # t = transforms.Compose([RemoveDims(), BackDim()])
+    # pred = MotionCorrDataset(test_save_filenames, lambda x: np.load(x), transform = t)
+    
+    posts = ['7752to7821', '7821to7889', '7889to7957', 
+             '7957to8025', '8025to8057', '8057to8161']
+    test_filenames = PostFilenames('../dncnn_3d/', 'motion_corrupt_',
+                              'motion_resid_', '.npy', posts)
+    pred_filenames = PostFilenames('../dncnn_3d/', 'motion_pred_dn_',
+                              'motion_pred_loss_dn_', '.npy', posts)
+    test = MotionCorrDataset(test_filenames, lambda x: np.load(x))
+    pred = MotionCorrDataset(pred_filenames, lambda x: np.load(x))
     
     w = MainWindow(test, pred)
     w.show()

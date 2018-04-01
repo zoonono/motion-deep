@@ -8,17 +8,25 @@ from torchvision import transforms
 import time
 import os
 
-exp_name = 'patch1'
+exp_name = 'vnet2d1'
 num_epochs = 10
-test_every_i = 60 # epoch size is 128, test 3 times per epoch
+test_every_i = 60 # epoch size is 128, test 2 times per epoch
 batch_size = 10
-size = np.array((32,32,32)) # originally (256, 256, 136), but patched
-in_ch = 2 # 2 channels: real, imag
-t = transforms.Compose([Patcher((32,32,32)), ToTensor()])
+size = np.array((256, 256)) # originally (256, 256, 136)
+in_ch = 1 # 2 channels: real, imag
+t = transforms.Compose([PickChannel(0), ToTensor()]) # Patcher((32,32,32))
 
 net = VNet(size, in_ch = in_ch)
 criterion = torch.nn.MSELoss()
-optimizer = optim.Adam(net.parameters(), lr = 0.001)
+optimizer = optim.Adam(net.parameters())
+
+filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
+                             'motion_resid_', '.npy', 128) # Assumes images start as C x H x W x D
+train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
+train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
+test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
+
+train, test = Splitter(train, depth = 136), Splitter(test, depth = 136)
 
 def compute_loss(dataset, criterion):
     avg = 0.0
@@ -29,12 +37,6 @@ def compute_loss(dataset, criterion):
         output = net(image)
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
-
-filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
-                             'motion_resid_', '.npy', 128) # Assumes images start as C x H x W x D
-train_filenames, test_filenames = filenames.split((0.78125, 0.21875))
-train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
-test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
 losses = []
 train_loss, test_loss = 0.0, 0.0
@@ -84,4 +86,4 @@ for epoch in range(num_epochs):
                 print(train_loss, time.time() - start_time)
     torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
     np.save(save_dir + 'loss_' + exp_name + '.npy', np.array(losses))
-print('Finished Training; Time Elapsed:', total_start_time - time.time())
+print('Finished Training; Time Elapsed:',  time.time() - total_start_time)

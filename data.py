@@ -36,6 +36,26 @@ class GenericFilenames:
         for i in range(len(self)):
             yield self[i]
 
+class PostFilenames:
+    def __init__(self, stem, image, label, ext, posts):
+        self.stem = stem
+        self.image = image
+        self.label = label
+        self.ext = ext
+        self.posts = posts
+
+    def __len__(self):
+        return len(self.posts)
+
+    def __getitem__(self, i):
+        x_path = self.stem + self.image + self.posts[i] + self.ext
+        y_path = self.stem + self.label + self.posts[i] + self.ext
+        return x_path, y_path
+    
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+            
 class MotionCorrDataset(Dataset):
     def __init__(self, filenames, load_func, transform = None):
         self.filenames = list(filenames)
@@ -74,27 +94,26 @@ class Splitter(Dataset):
             self.depth = dataset[0].shape[3]
         else:
             self.depth = depth
+        self.depth = list(range(self.depth))
         
     def __len__(self):
         return len(self.dataset)
         
     def __getitem__(self, i):
-        """Returns the ith item that would be returned by the iterator.
-        Not as efficient because it reads one example file repeatedly for each slice.
-        """
-        i, d = i // self.depth, i % self.depth
         example = self.dataset[i]
         x, y = example['image'], example['label']
-        return {'image': x[d], 'label': y[d]}
+        d = self.depth[np.random.randint(0, len(self.depth))]
+        return {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
         
     def __iter__(self):
         for example in self.dataset:
             x, y = example['image'], example['label']
-            for d in range(self.depth):
-                yield {'image': x[d], 'label': y[d]}
+            shuffle(self.depth)
+            for d in self.depth:
+                yield {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
     
     def shuffle(self):
-        if hasattr(self.dataset, shuffle):
+        if hasattr(self.dataset, 'shuffle'):
             self.dataset.shuffle()
 
 class Patcher(object):
@@ -168,6 +187,18 @@ class ToTensor(object):
         return {'image': torch.from_numpy(image.copy()).float(),
                 'label': torch.from_numpy(label.copy()).float()}
 
+class PickChannel(object):
+    """C x H x W x D -> C x H x W x D
+    """
+    def __init__(self, channel):
+        self.channel = channel
+        
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+        
+        return {'image': image[self.channel:self.channel+1,:,:,:],
+                'label': label[self.channel:self.channel+1,:,:,:]}
+                
 class RemoveDims(object):
     """Removes singleton dimensions.
     """
@@ -188,11 +219,14 @@ class RemoveDims(object):
 class FrontDim(object):
     """Adds a singleton dimension at the front of a numpy array.
     """
-
+    def __init__(self, both = False):
+        self.both = both
+    
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
         image = np.expand_dims(image, axis = 0)
-        label = np.expand_dims(label, axis = 0)
+        if self.both:
+            label = np.expand_dims(label, axis = 0)
         
         return {'image': image,
                 'label': label}
@@ -200,11 +234,14 @@ class FrontDim(object):
 class BackDim(object):
     """Adds a singleton dimension at the end of a numpy array.
     """
+    def __init__(self, both = False):
+        self.both = both
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
         image = np.expand_dims(image, axis = len(image.shape))
-        label = np.expand_dims(label, axis = len(label.shape))
+        if self.both:
+            label = np.expand_dims(label, axis = len(label.shape))
         
         return {'image': image,
                 'label': label}
