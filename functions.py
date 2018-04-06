@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp2d
+import torch
+from torch.autograd import Variable
 
 def interp_double(arr):
     x = np.array(list(range(1, arr.shape[1] + 1)))
@@ -26,3 +28,13 @@ def d_out(d_in, padding, kernel, stride):
 
 def zero_pad(arr, n = 1):
     return np.pad(arr, ((0, n),), 'constant')
+    
+def compute_loss(dataset, criterion):
+    avg = 0.0
+    for i, example in enumerate(dataset):
+        image, label = example['image'], example['label']
+        image, label = Variable(image), Variable(label)
+        image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
+        output = net(image)
+        avg += (criterion(output, label).data[0] - avg) / (i + 1)
+    return avg

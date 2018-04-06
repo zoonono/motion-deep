@@ -8,6 +8,7 @@ import numpy as np
 
 from model import *
 from data import *
+from functions import *
 
 name = 'DnCnn'
 dir = 'output/'
@@ -18,5 +19,39 @@ net = DnCnn(size, depth, in_ch)
 net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
 net.double()
 
-a = Variable(torch.ones((256,256)))[None,None,:,:]
-b = net(a)
+t = None
+filenames = GenericFilenames('../motion_data_resid_full', 
+    'motion_corrupt_', 'motion_resid_', '.npy', 128)
+_, test_filenames = filenames.split((0.78125, 0.21875))
+test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t) # C x H x W x D
+
+criterion = torch.nn.MSELoss()
+
+pred_filenames = GenericFilenames('../motion_data_resid_full_pred', 
+    'motion_pred_', 'motion_pred_loss_', '.npy', 128)
+_, save_filenames = filenames.split((0.78125, 0.21875))
+
+
+torch.cuda.set_device(1)
+net.cuda()
+
+print("Generating test example predictions...")
+start_time = time.time()
+for i, example in enumerate(test):
+    image, label = example['image'], example['label']
+    image, label = Variable(image.cuda()), Variable(label.cuda())
+    image, label = image[None,:,:,:,:], label[None,:,:,:,:]
+    
+    output = net(image[:,0,:,:,:])
+    loss = criterion(output, label[:,0,:,:,:]).data[0]
+    output2 = net(image[:,1,:,:,:])
+    loss2 = criterion(output, label[:,1,:,:,:]).data[0]
+    print("Losses for example", i, ":", loss, loss2)
+    
+    loss_filename, pred_filename = test_save_filenames[i]
+    # need to do output.data.cpu().numpy() if cuda
+    np.save(pred_filename, np.concatenate((
+        output.data.cpu().numpy(), output2.data.cpu().numpy()),
+        axis = 0)) #each is B x H x W x D, we treat B as C
+    np.save(loss_filename, np.array([loss, loss2]))
+print("Time elapsed:", time.time() - start_time)
