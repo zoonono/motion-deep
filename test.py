@@ -19,7 +19,7 @@ net = DnCnn(size, depth, in_ch)
 net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
 net.double()
 
-t = None
+t = t = transforms.Compose([ToTensor()])
 filenames = GenericFilenames('../motion_data_resid_full/', 
     'motion_corrupt_', 'motion_resid_', '.npy', 128)
 _, test_filenames = filenames.split((0.78125, 0.21875))
