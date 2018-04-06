@@ -20,14 +20,14 @@ net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
 net.double()
 
 t = None
-filenames = GenericFilenames('../motion_data_resid_full', 
+filenames = GenericFilenames('../motion_data_resid_full/', 
     'motion_corrupt_', 'motion_resid_', '.npy', 128)
 _, test_filenames = filenames.split((0.78125, 0.21875))
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t) # C x H x W x D
 
 criterion = torch.nn.MSELoss()
 
-pred_filenames = GenericFilenames('../motion_data_resid_full_pred', 
+pred_filenames = GenericFilenames('../motion_data_resid_full_pred/', 
     'motion_pred_', 'motion_pred_loss_', '.npy', 128)
 _, save_filenames = filenames.split((0.78125, 0.21875))
 
