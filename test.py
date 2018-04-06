@@ -42,16 +42,17 @@ for i, example in enumerate(test):
     image, label = Variable(image.cuda()), Variable(label.cuda())
     image, label = image[None,:,:,:,:], label[None,:,:,:,:]
     
-    output = net(image[:,0,:,:,:])
-    loss = criterion(output, label[:,0,:,:,:]).data[0]
-    output2 = net(image[:,1,:,:,:])
-    loss2 = criterion(output, label[:,1,:,:,:]).data[0]
+    output = net(image[:,0:1,:,:,:])
+    loss = criterion(output, label[:,0:1,:,:,:]).data[0]
+    output2 = net(image[:,1:2,:,:,:])
+    loss2 = criterion(output, label[:,1:2,:,:,:]).data[0]
     print("Losses for example", i, ":", loss, loss2)
     
     loss_filename, pred_filename = test_save_filenames[i]
     # need to do output.data.cpu().numpy() if cuda
     np.save(pred_filename, np.concatenate((
-        output.data.cpu().numpy(), output2.data.cpu().numpy()),
-        axis = 0)) #each is B x H x W x D, we treat B as C
+        output.data.cpu().numpy()[0,:,:,:,:], 
+        output2.data.cpu().numpy()[0,:,:,:,:]),
+        axis = 0)) #each is B x C x H x W x D
     np.save(loss_filename, np.array([loss, loss2]))
 print("Time elapsed:", time.time() - start_time)
