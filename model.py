@@ -94,7 +94,6 @@ class DnCnn(nn.Module):
     def forward(self, x):
         x = self.prelu1(self.conv1(x))
         for i in range(self.depth):
-            print(x.shape)
             c_name = "conv" + str(i + 2)
             b_name = "batch" + str(i + 2)
             p_name = "prelu" + str(i + 2)

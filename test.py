@@ -60,9 +60,9 @@ for i, example in enumerate(test):
         else:
             pred = np.concatenate((pred, out_stacked), axis = 3)
             losses = np.vstack((losses, loss_stacked))
-    print("Losses for example", i, ":", np.mean(losses, axis = 1))
+    print("Losses for example", i, ":", np.mean(losses, axis = 0))
     
-    loss_filename, pred_filename = test_save_filenames[i]
+    loss_filename, pred_filename = save_filenames[i]
     # need to do output.data.cpu().numpy() if cuda
     np.save(pred_filename, pred) #each is B x C x H x W x D
     np.save(loss_filename, losses)

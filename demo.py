@@ -22,8 +22,8 @@ net = VNet(size)
 save_dir = 'output/'
 net.load_state_dict(torch.load(save_dir + 'model.pth'))
 
-save_filenames = GenericFilenames('../motion_data_resid/', 'motion_pred_loss_',
-                             'motion_pred_', '.npy', 128)
+save_filenames = GenericFilenames('../motion_data_resid/', 
+    'motion_pred_loss_', 'motion_pred_', '.npy', 128)
 train_save_filenames, test_save_filenames = save_filenames.split((0.78125, 0.21875))
 
 print("Generating test example predictions...")
