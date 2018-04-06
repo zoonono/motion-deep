@@ -8,15 +8,18 @@ from torchvision import transforms
 import time
 import os
 
-exp_name = 'vnet2d1'
-num_epochs = 10
-test_every_i = 60 # epoch size is 128, test 2 times per epoch
-batch_size = 10
+exp_name = 'dncnn1'
+num_epochs = 3
+# test_every_i = 60 # epoch size is 128, test 2 times per epoch
+test_every_i = 5000 # epoch size is 15504
+display_every_i = 500
+batch_size = 1
 size = np.array((256, 256)) # originally (256, 256, 136)
-in_ch = 1 # 2 channels: real, imag
-t = transforms.Compose([PickChannel(0), ToTensor()]) # Patcher((32,32,32))
+in_ch = 2 # 2 channels: real, imag
+t = transforms.Compose([ToTensor()]) # PickChannel(0), Decimate(axes = (1, 2, 3)), Patcher((32,32,32))
 
-net = VNet(size, in_ch = in_ch)
+#net = VNet(size, in_ch = in_ch)
+net = DnCnn(size, 20, in_ch = in_ch)
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
@@ -82,7 +85,11 @@ for epoch in range(num_epochs):
                       (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
                 losses.append([train_loss, test_loss])
                 train_loss = 0.0
-            else:
+            elif i % display_every_i == display_every_i - 1:
+                print(train_loss, time.time() - start_time)
+                losses.append([train_loss, test_loss])
+                train_loss = 0.0
+            elif i == 0:
                 print(train_loss, time.time() - start_time)
     torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
     np.save(save_dir + 'loss_' + exp_name + '.npy', np.array(losses))

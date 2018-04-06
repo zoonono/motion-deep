@@ -70,21 +70,23 @@ def conv_t_padded(ch_in, ch_out, kernel, stride, d_in, d_out, dim = '2d'):
 class DnCnn(nn.Module):
     """Implements the DnCNN architecture: https://arxiv.org/abs/1608.03981
     """
-    def __init__(self, size, depth):
+    def __init__(self, size, depth, in_ch, factor = 1):
         super(DnCnn, self).__init__()
-        self.size = np.array(size)
+        size = np.array(size)
+        self.size = size
         self.depth = depth
+        self.factor = factor
 
-        self.conv1 = conv_padded(1, 64, 3, 1, size, size)
+        self.conv1 = conv_padded(in_ch, 64, 3 * factor, 1, size, size)
         self.prelu1 = nn.PReLU(num_parameters = 64)
         for i in range(self.depth):
             c_name = "conv" + str(i + 2)
             b_name = "batch" + str(i + 2)
             p_name = "prelu" + str(i + 2)
-            setattr(self, c_name, conv_padded(64, 64, 3, 1, size, size))
+            setattr(self, c_name, conv_padded(64, 64, 3 * factor, 1, size, size))
             setattr(self, b_name, nn.BatchNorm2d(64))
             setattr(self, p_name, nn.PReLU(num_parameters = 64))
-        self.convf = conv_padded(64, 1, 3, 1, size, size)
+        self.convf = conv_padded(64, in_ch, 3 * factor, 1, size, size)
 
     def forward(self, x):
         x = self.prelu1(self.conv1(x))
@@ -98,6 +100,9 @@ class DnCnn(nn.Module):
             x = prelu(batch(x + conv(x)))
         x = self.convf(x)
         return x
+   
+    def double(self):
+        self.factor *= 2
 
 class VNet(nn.Module):
     """V-net architecture: https://arxiv.org/abs/1606.04797

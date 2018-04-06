@@ -10,11 +10,11 @@ from model import *
 from data import *
 
 name = 'DnCnn'
-dir = '../output/'
+dir = 'output/'
 size = (128, 128)
 in_ch = 1
 depth = 20
 net = DnCnn(size, depth, in_ch)
-net.load_save_dict(torch.load(dir + 'model' + name + '.pth'))
+net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
 net.double()
 

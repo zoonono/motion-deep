@@ -132,25 +132,25 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 def main(): 
     a = QtWidgets.QApplication(sys.argv)
     
-    # filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
-                                 # 'motion_resid_', '.npy', 8704)
-    # train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
-    # test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = BackDim(both = True))
+    filenames = GenericFilenames('../motion_data_resid_2d/', 'motion_corrupt_',
+                                 'motion_resid_', '.npy', 8704)
+    train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
+    test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = BackDim(both = True))
     
-    # save_filenames = GenericFilenames('../dncnn/', 'motion_pred_dn_',
-                             # 'motion_pred_loss_dn_', '.npy', 8704)
-    # train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
-    # t = transforms.Compose([RemoveDims(), BackDim()])
-    # pred = MotionCorrDataset(test_save_filenames, lambda x: np.load(x), transform = t)
+    save_filenames = GenericFilenames('../dncnn/', 'motion_pred_dn_',
+                             'motion_pred_loss_dn_', '.npy', 8704)
+    train_save_filenames, test_save_filenames = save_filenames.split((0.890625, 0.109375))
+    t = transforms.Compose([RemoveDims(), BackDim()])
+    pred = MotionCorrDataset(test_save_filenames, lambda x: np.load(x), transform = t)
     
-    posts = ['7752to7821', '7821to7889', '7889to7957', 
-             '7957to8025', '8025to8057', '8057to8161']
-    test_filenames = PostFilenames('../dncnn_3d/', 'motion_corrupt_',
-                              'motion_resid_', '.npy', posts)
-    pred_filenames = PostFilenames('../dncnn_3d/', 'motion_pred_dn_',
-                              'motion_pred_loss_dn_', '.npy', posts)
-    test = MotionCorrDataset(test_filenames, lambda x: np.load(x))
-    pred = MotionCorrDataset(pred_filenames, lambda x: np.load(x))
+    # posts = ['7752to7821', '7821to7889', '7889to7957', 
+             # '7957to8025', '8025to8057', '8057to8161']
+    # test_filenames = PostFilenames('../dncnn_3d/', 'motion_corrupt_',
+                              # 'motion_resid_', '.npy', posts)
+    # pred_filenames = PostFilenames('../dncnn_3d/', 'motion_pred_dn_',
+                              # 'motion_pred_loss_dn_', '.npy', posts)
+    # test = MotionCorrDataset(test_filenames, lambda x: np.load(x))
+    # pred = MotionCorrDataset(pred_filenames, lambda x: np.load(x))
     
     w = MainWindow(test, pred)
     w.show()
