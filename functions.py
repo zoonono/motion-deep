@@ -13,9 +13,16 @@ def double_length(x):
     return np.array(list(range(x * 2 - 1, x * (x * 2 - 1) + 1,  
             x - 1))) / (x * 2 - 1)
             
-def dbl(arr):
-    nrr = np.zeros(np.array(arr.shape) * np.array((1,1,2,2)))
+def double_weight(arr):
+    nrr = np.zeros(np.array(arr.shape) * np.array((1,1,2,2)) 
+                   + np.array((0,0,1,1)))
     for i in range(arr.shape[0]):
         for j in range(arr.shape[1]):
-            nrr[i][j] = interp_double(arr[i][j])
+            nrr[i][j] = zero_pad(interp_double(arr[i][j]))
     return nrr
+    
+def d_out(d_in, padding, kernel, stride):
+    return 1 + int((d_in + 2 * padding - kernel)/stride)
+
+def zero_pad(arr, n = 1):
+    return np.pad(arr, ((0, n),), 'constant')

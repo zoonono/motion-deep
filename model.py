@@ -4,6 +4,8 @@ import numpy as np
 
 from math import ceil
 
+from functions import *
+
 def pad(d_in, d_out, kernel, stride):
     """Returns padding such that a convolution produces d_out given d_in.
     Only works if such a padding is possible.
@@ -75,6 +77,7 @@ class DnCnn(nn.Module):
         size = np.array(size)
         self.size = size
         self.depth = depth
+        self.in_ch = in_ch
         self.factor = factor
 
         self.conv1 = conv_padded(in_ch, 64, 3 * factor, 1, size, size)
@@ -91,6 +94,7 @@ class DnCnn(nn.Module):
     def forward(self, x):
         x = self.prelu1(self.conv1(x))
         for i in range(self.depth):
+            print(x.shape)
             c_name = "conv" + str(i + 2)
             b_name = "batch" + str(i + 2)
             p_name = "prelu" + str(i + 2)
@@ -102,7 +106,21 @@ class DnCnn(nn.Module):
         return x
    
     def double(self):
+        """Only works once, fix soon"""
         self.factor *= 2
+        self.size *= 2
+        
+        self.conv1 = conv_padded(self.in_ch, 64, 3 * self.factor + 1, 1, self.size, self.size)
+        for i in range(self.depth):
+            c_name = "conv" + str(i + 2)
+            setattr(self, c_name, conv_padded(64, 64, 3 * self.factor + 1, 1, self.size, self.size))
+        self.convf = conv_padded(64, self.in_ch, 3 * self.factor + 1, 1, self.size, self.size)
+        dict = self.state_dict()
+        keys = dict.keys()
+        for key in keys:
+            if key.startswith('conv') and key.endswith('weight'):
+                dict[key] = double_weight(dict[key])
+        
 
 class VNet(nn.Module):
     """V-net architecture: https://arxiv.org/abs/1606.04797

@@ -18,3 +18,5 @@ net = DnCnn(size, depth, in_ch)
 net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
 net.double()
 
+a = Variable(torch.ones((256,256)))[None,None,:,:]
+b = net(a)
