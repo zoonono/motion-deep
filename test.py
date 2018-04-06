@@ -43,7 +43,7 @@ for i, example in enumerate(test):
     image, label = image[None,:,:,:,:], label[None,:,:,:,:]
     
     pred, losses = None, None
-    for d in range(image.shape[5]):
+    for d in range(image.shape[4]):
         output = net(image[:,0:1,:,:,d])
         loss = criterion(output, label[:,0:1,:,:,d]).data[0]
         output2 = net(image[:,1:2,:,:,d])
