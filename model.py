@@ -118,7 +118,7 @@ class DnCnn(nn.Module):
         keys = dict.keys()
         for key in keys:
             if key.startswith('conv') and key.endswith('weight'):
-                dict[key] = double_weight(dict[key])
+                dict[key] = double_weight(dict[key], kind = 'zero')
         
 
 class VNet(nn.Module):
