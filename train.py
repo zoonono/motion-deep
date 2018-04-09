@@ -15,8 +15,8 @@ test_every_i = 5000 # epoch size is 15504
 display_every_i = 500
 batch_size = 1
 size = np.array((256, 256)) # originally (256, 256, 136)
-in_ch = 2 # 2 channels: real, imag
-t = transforms.Compose([ToTensor()]) # PickChannel(0), Decimate(axes = (1, 2, 3)), Patcher((32,32,32))
+in_ch = 1 # 2 channels: real, imag
+t = transforms.Compose([PickChannel(0), ToTensor()]) # PickChannel(0), Decimate(axes = (1, 2, 3)), Patcher((32,32,32))
 
 #net = VNet(size, in_ch = in_ch)
 net = DnCnn(size, 20, in_ch = in_ch)
@@ -25,7 +25,7 @@ optimizer = optim.Adam(net.parameters())
 
 filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
                              'motion_resid_', '.npy', 128) # Assumes images start as C x H x W x D
-train_filenames, test_filenames = filenames.split((0.890625, 0.109375))
+train_filenames, test_filenames = filenames.split((0.9453125, 0.0546875))
 train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
 test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
 
@@ -35,7 +35,7 @@ def compute_loss(dataset, criterion):
     avg = 0.0
     for i, example in enumerate(dataset):
         image, label = example['image'], example['label']
-        image, label = Variable(image), Variable(label)
+        image, label = Variable(image.cuda()), Variable(label.cuda())
         image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
         output = net(image)
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
@@ -46,6 +46,9 @@ train_loss, test_loss = 0.0, 0.0
 save_dir = 'output/'
 if not(os.path.exists(save_dir)):
     os.mkdir(save_dir)
+
+torch.cuda.set_device(1)
+net.cuda()
     
 print('Beginning Training...')
 total_start_time = time.time()
@@ -59,7 +62,7 @@ for epoch in range(num_epochs):
         start_time = time.time()
 
         image, label = example['image'], example['label']
-        image, label = Variable(image), Variable(label)
+        image, label = Variable(image.cuda()), Variable(label.cuda())
         image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
         
         if image_batch is None:

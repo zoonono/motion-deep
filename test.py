@@ -29,7 +29,7 @@ criterion = torch.nn.MSELoss()
 
 pred_filenames = GenericFilenames('../motion_data_resid_full_pred/', 
     'motion_pred_', 'motion_pred_loss_', '.npy', 128)
-_, save_filenames = filenames.split((0.78125, 0.21875))
+_, save_filenames = pred_filenames.split((0.78125, 0.21875))
 
 
 torch.cuda.set_device(1)
@@ -38,32 +38,34 @@ net.cuda()
 print("Generating test example predictions...")
 start_time = time.time()
 for i, example in enumerate(test):
-    image, label = example['image'], example['label']
-    image, label = Variable(image.cuda()), Variable(label.cuda())
-    image, label = image[None,:,:,:,:], label[None,:,:,:,:]
-    
-    pred, losses = None, None
-    for d in range(image.shape[4]):
-        output = net(image[:,0:1,:,:,d])
-        loss = criterion(output, label[:,0:1,:,:,d]).data[0]
-        output2 = net(image[:,1:2,:,:,d])
-        loss2 = criterion(output, label[:,1:2,:,:,d]).data[0]
+    if i < 5:
+        image, label = example['image'], example['label']
+        image, label = Variable(image.cuda()), Variable(label.cuda())
+        image, label = image[None,:,:,:,:], label[None,:,:,:,:]
         
-        out_stacked = np.concatenate((
-                output.data.cpu().numpy()[0,:,:,:], 
-                output2.data.cpu().numpy()[0,:,:,:]),
-                axis = 0)[:,:,:,None] # B x C x H x W > C x H x W x D
-        loss_stacked = np.array([loss, loss2])
-        if pred is None:
-            pred = out_stacked
-            losses = loss_stacked
-        else:
-            pred = np.concatenate((pred, out_stacked), axis = 3)
-            losses = np.vstack((losses, loss_stacked))
-    print("Losses for example", i, ":", np.mean(losses, axis = 0))
-    
-    loss_filename, pred_filename = save_filenames[i]
-    # need to do output.data.cpu().numpy() if cuda
-    np.save(pred_filename, pred) #each is B x C x H x W x D
-    np.save(loss_filename, losses)
+        pred, losses = None, None
+        for d in range(image.shape[4]):
+            output = net(image[:,0:1,:,:,d])
+            loss = criterion(output, label[:,0:1,:,:,d]).data[0]
+            output2 = net(image[:,1:2,:,:,d])
+            loss2 = criterion(output, label[:,1:2,:,:,d]).data[0]
+            
+            out_stacked = np.concatenate((
+                    output.data.cpu().numpy()[0,:,:,:], 
+                    output2.data.cpu().numpy()[0,:,:,:]),
+                    axis = 0)[:,:,:,None] # B x C x H x W > C x H x W x D
+            loss_stacked = np.array([loss, loss2])
+            if pred is None:
+                pred = out_stacked
+                losses = loss_stacked
+            else:
+                pred = np.concatenate((pred, out_stacked), axis = 3)
+                losses = np.vstack((losses, loss_stacked))
+        print("Losses for example", i, ":", np.mean(losses, axis = 0))
+        
+        loss_filename, pred_filename = save_filenames[i]
+        print("Saving: ", loss_filename, pred_filename)
+        # need to do output.data.cpu().numpy() if cuda
+        np.save(pred_filename, pred) #each is B x C x H x W x D
+        np.save(loss_filename, losses)
 print("Time elapsed:", time.time() - start_time)
