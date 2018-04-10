@@ -8,7 +8,7 @@ from torchvision import transforms
 import time
 import os
 
-exp_name = 'dncnn1'
+exp_name = 'dncnn_d10'
 num_epochs = 3
 # test_every_i = 60 # epoch size is 128, test 2 times per epoch
 test_every_i = 5000 # epoch size is 15504
@@ -18,17 +18,17 @@ size = np.array((256, 256)) # originally (256, 256, 136)
 in_ch = 1 # 2 channels: real, imag
 t = transforms.Compose([PickChannel(0), ToTensor()]) # PickChannel(0), Decimate(axes = (1, 2, 3)), Patcher((32,32,32))
 
-#net = VNet(size, in_ch = in_ch)
-net = DnCnn(size, 20, in_ch = in_ch)
+# net = VNet(size, in_ch = in_ch)
+net = DnCnn(size, 10, in_ch = in_ch)
 
-losses = []
+losses = np.array([0.0, 0.0])
 train_loss, test_loss = 0.0, 0.0
 save_dir = 'output/'
 if not(os.path.exists(save_dir)):
     os.mkdir(save_dir)
     
-net.load_state_dict(torch.load(save_dir + 'model_' + exp_name + '.pth'))
-losses = np.load(save_dir + 'loss_' + exp_name + '.npy')
+# net.load_state_dict(torch.load(save_dir + 'model_' + exp_name + '.pth'))
+# losses = np.load(save_dir + 'loss_' + exp_name + '.npy')
 
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
@@ -90,14 +90,14 @@ for epoch in range(num_epochs):
                 test_loss = compute_loss(test, criterion)
                 print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                       (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-                losses = np.vstack(losses, [train_loss, test_loss])
+                losses = np.vstack((losses, [train_loss, test_loss]))
                 train_loss = 0.0
             elif i % display_every_i == display_every_i - 1:
                 print(train_loss, time.time() - start_time)
-                losses = np.vstack(losses, [train_loss, test_loss])
+                losses = np.vstack((losses, [train_loss, test_loss]))
                 train_loss = 0.0
             elif i == 0:
                 print(train_loss, time.time() - start_time)
     torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
-    np.save(save_dir + 'loss_' + exp_name + '.npy', np.array(losses))
+    np.save(save_dir + 'loss_' + exp_name + '.npy', losses)
 print('Finished Training; Time Elapsed:',  time.time() - total_start_time)

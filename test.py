@@ -10,14 +10,14 @@ from model import *
 from data import *
 from functions import *
 
-name = 'DnCnn'
+name = 'dncnn1'
 dir = 'output/'
-size = (128, 128)
+size = (256, 256)
 in_ch = 1
 depth = 20
 net = DnCnn(size, depth, in_ch)
-net.load_state_dict(torch.load(dir + 'model' + name + '.pth'))
-net.double()
+net.load_state_dict(torch.load(dir + 'model_' + name + '.pth'))
+# net.double()
 
 t = t = transforms.Compose([ToTensor()])
 filenames = GenericFilenames('../motion_data_resid_full/', 
@@ -27,8 +27,7 @@ test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t) # 
 
 criterion = torch.nn.MSELoss()
 
-pred_filenames = GenericFilenames('../motion_data_resid_full_pred/', 
-    'motion_pred_', 'motion_pred_loss_', '.npy', 128)
+pred_filenames = GenericFilenames('../motion_data_resid_full_pred/', 'motion_pred_', 'motion_pred_loss_', name + '.npy', 128)
 _, save_filenames = pred_filenames.split((0.78125, 0.21875))
 
 
@@ -63,7 +62,7 @@ for i, example in enumerate(test):
                 losses = np.vstack((losses, loss_stacked))
         print("Losses for example", i, ":", np.mean(losses, axis = 0))
         
-        loss_filename, pred_filename = save_filenames[i]
+        pred_filename, loss_filename = save_filenames[i]
         print("Saving: ", loss_filename, pred_filename)
         # need to do output.data.cpu().numpy() if cuda
         np.save(pred_filename, pred) #each is B x C x H x W x D
