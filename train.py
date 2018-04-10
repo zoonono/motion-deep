@@ -20,6 +20,16 @@ t = transforms.Compose([PickChannel(0), ToTensor()]) # PickChannel(0), Decimate(
 
 #net = VNet(size, in_ch = in_ch)
 net = DnCnn(size, 20, in_ch = in_ch)
+
+losses = []
+train_loss, test_loss = 0.0, 0.0
+save_dir = 'output/'
+if not(os.path.exists(save_dir)):
+    os.mkdir(save_dir)
+    
+net.load_state_dict(torch.load(save_dir + 'model_' + exp_name + '.pth'))
+losses = np.load(save_dir + 'loss_' + exp_name + '.npy')
+
 criterion = torch.nn.MSELoss()
 optimizer = optim.Adam(net.parameters())
 
@@ -40,12 +50,6 @@ def compute_loss(dataset, criterion):
         output = net(image)
         avg += (criterion(output, label).data[0] - avg) / (i + 1)
     return avg
-
-losses = []
-train_loss, test_loss = 0.0, 0.0
-save_dir = 'output/'
-if not(os.path.exists(save_dir)):
-    os.mkdir(save_dir)
 
 torch.cuda.set_device(1)
 net.cuda()
@@ -81,16 +85,16 @@ for epoch in range(num_epochs):
             image_batch, label_batch = None, None
             
             # train_loss is a moving avg, so it lags behind test_loss
-            train_loss += (loss.data[0] - train_loss) / (i % test_every_i + 1)
+            train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
             if i % test_every_i == test_every_i - 1:
                 test_loss = compute_loss(test, criterion)
                 print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
                       (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-                losses.append([train_loss, test_loss])
+                losses = np.vstack(losses, [train_loss, test_loss])
                 train_loss = 0.0
             elif i % display_every_i == display_every_i - 1:
                 print(train_loss, time.time() - start_time)
-                losses.append([train_loss, test_loss])
+                losses = np.vstack(losses, [train_loss, test_loss])
                 train_loss = 0.0
             elif i == 0:
                 print(train_loss, time.time() - start_time)
