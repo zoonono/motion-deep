@@ -1,261 +1,103 @@
-import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-from scipy.signal import decimate
-import time
-from random import shuffle
 
-class GenericFilenames:
-    def __init__(self, stem, image, label, ext, size, offset = 0):
-        self.stem = stem
-        self.image = image
-        self.label = label
-        self.ext = ext
-        self.size = size
-        self.offset = offset
+import random
+from fnmatch import fnmatch
+from os import listdir
+from os.path import join
 
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, i):
-        x_path = self.stem + self.image + str(i + self.offset) + self.ext
-        y_path = self.stem + self.label + str(i + self.offset) + self.ext
-        return x_path, y_path
-
-    def split(self, proportions):
-        splitted_filenames = []
-        offset = 0
-        for p in proportions:
-            splitted_filenames.append(GenericFilenames(self.stem, self.image,
-                    self.label, self.ext, int(self.size * p), offset = offset))
-            offset += int(self.size * p)
-        return splitted_filenames
+class NdarrayDataset:
+    """Loads data saved as ndarrays in .npy files using np.save(...).
     
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-
-class PostFilenames:
-    def __init__(self, stem, image, label, ext, posts):
-        self.stem = stem
-        self.image = image
-        self.label = label
-        self.ext = ext
-        self.posts = posts
-
-    def __len__(self):
-        return len(self.posts)
-
-    def __getitem__(self, i):
-        x_path = self.stem + self.image + self.posts[i] + self.ext
-        y_path = self.stem + self.label + self.posts[i] + self.ext
-        return x_path, y_path
-    
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-            
-class MotionCorrDataset(Dataset):
-    def __init__(self, filenames, load_func, transform = None):
-        self.filenames = list(filenames)
-        self.load_func = load_func
+    ndarray dimensions: T x H x W x D
+    output: {'image': C x H x W x D, 'label': C x H x W x D}
+        T: type (0: image, 1: label)
+        C: channel
+        H, W, D: spatial dimensions
+    """
+    def __init__(self, dir, transform = None):
+        self.dir = dir
+        self.files = [f for f in listdir(dir) if fnmatch(f, '*.npy')]
         self.transform = transform
-
+    
     def __len__(self):
-        return (len(self.filenames))
+        return len(self.files)
+    
+    def __getitem__(self, i):
+        return self.load(join(self.dir, self.files[i]))
+        
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
     
     def load(self, filename):
-        x_path, y_path = filename
-        x = self.load_func(x_path)
-        y = self.load_func(y_path)
-        sample = {'image': x, 'label': y}
+        x, y = np.load(filename)
+        example = {'image': x, 'label': y}
         if self.transform:
-            sample = self.transform(sample)
-        return sample
-    
-    def __getitem__(self, i):
-        return self.load(self.filenames[i])
-    
-    def __iter__(self):
-        for filename in self.filenames:
-            yield self.load(filename)
-    
-    def shuffle(self):
-        shuffle(self.filenames)
-
-class Splitter(Dataset):
-    """Splits 3D images into 2D slices by the 4th axis.
-    Assumes images are C x H x W x D, outputs C x H x W.
-    """
-    def __init__(self, dataset, depth = None):
-        self.dataset = dataset
-        if not depth:
-            self.depth = dataset[0].shape[3]
-        else:
-            self.depth = depth
-        self.depth = list(range(self.depth))
-        
-    def __len__(self):
-        return len(self.dataset)
-        
-    def __getitem__(self, i):
-        example = self.dataset[i]
-        x, y = example['image'], example['label']
-        d = self.depth[np.random.randint(0, len(self.depth))]
-        return {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
-        
-    def __iter__(self):
-        for example in self.dataset:
+            example = self.transform(example)
+        if len(example['image'].shape) == 3:
             x, y = example['image'], example['label']
-            shuffle(self.depth)
-            for d in self.depth:
-                yield {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
+            example = {'image': x[None,:,:,:], 
+                       'label': y[None,:,:,:]}
+        return example
     
     def shuffle(self):
-        if hasattr(self.dataset, 'shuffle'):
-            self.dataset.shuffle()
+        random.shuffle(self.files)
 
-class Patcher(object):
-    """Randomly crops 3D images into patches of the given size.
-    Assumes input is C x H x W x D, patch_size is H x W x D.
-    """
-    def __init__(self, patch_size):
-        self.patch_size = patch_size
-        
-    def __call__(self, sample):
-        x, y = sample['image'], sample['label']
-        p_h, p_w, p_d = self.patch_size
-        h = np.random.randint(0, x.shape[1] - p_h)
-        w = np.random.randint(0, x.shape[2] - p_w)
-        d = np.random.randint(0, x.shape[3] - p_d)
-        return {'image': x[:,h:h+p_h,w:w+p_w,d:d+p_d], 
-                'label': y[:,h:h+p_h,w:w+p_w,d:d+p_d]}
-            
-class Decimate(object):
-    """Undersample each axis by some factor."""
-    def __init__(self, factor = 2, axes = None):
-        self.factor = factor
-        self.axes = axes # if None, decimate all axes
-
-    def downsample(self, arr):
-        """Downsamples axes in array by factor of 2 using scipy's decimate."""
-        if self.axes:
-            for axis in self.axes:
-                arr = decimate(arr, self.factor, axis = axis)
-        else: # if there is no specified list of axes, decimate all axes
-            for axis in range(len(arr.shape)):
-                arr = decimate(arr, self.factor, axis = axis)
-        return arr
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        return {'image': self.downsample(image),
-                'label': self.downsample(label)}
-
-class Residual(object):
-    """Saves the residual (image - label) instead of the label itself."""
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        return {'image': image,
-                'label': image - label}
-
-class RealImag(object):
-    """Splits complex data into real and imag components as channels.
-    H x W x D x E -> C x H x W x D x E
-    """
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        image = np.expand_dims(image, axis = 0)
-        label = np.expand_dims(label, axis = 0)
-        image = np.concatenate((np.real(image), np.imag(image)), axis = 0)
-        label = np.concatenate((np.real(label), np.imag(label)), axis = 0)
-
-        return {'image': image,
-                'label': label}                
-            
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        return {'image': torch.from_numpy(image.copy()).float(),
-                'label': torch.from_numpy(label.copy()).float()}
-
-class PickChannel(object):
-    """C x H x W x D -> C x H x W x D
-    """
-    def __init__(self, channel):
-        self.channel = channel
-        
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        
-        return {'image': image[self.channel:self.channel+1,:,:,:],
-                'label': label[self.channel:self.channel+1,:,:,:]}
-                
-class RemoveDims(object):
-    """Removes singleton dimensions.
-    """
+class NdarrayDatasetSplit(NdarrayDataset):
+    """Splits the arrays somehow (abstract class)."""
+    def __init__(self, dir, transform = None):
+        super().__init__(dir, transform)
+        self.i = 0
+        self.example = super().__getitem__(self.i)
+        self.depth = None
     
-    def __init__(self, axes = None, both = False):
-        self.axes = axes
-        self.both = both
-        
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        
-        image = np.squeeze(image, axis = self.axes)
-        if self.both:
-            label = np.squeeze(label, axis = self.axes)
-        return {'image': image,
-                'label': label}
-                
-class FrontDim(object):
-    """Adds a singleton dimension at the front of a numpy array.
-    """
-    def __init__(self, both = False):
-        self.both = both
+    def __len__(self):
+        return super().__len__() * self.depth
     
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        image = np.expand_dims(image, axis = 0)
-        if self.both:
-            label = np.expand_dims(label, axis = 0)
+    def __getitem__(self, i):
+        i, d = i // self.depth, i % self.depth
+        if i != self.i:
+            self.i = i
+            self.example = super().__getitem__(self.i)
+        return self.pick(d)
+    
+    def pick(self, d):
+        raise NotImplementedError
         
-        return {'image': image,
-                'label': label}
+class NdarrayDataset2d(NdarrayDatasetSplit):
+    """Splits the arrays by the D dimension."""
+    def __init__(self, dir, transform = None):
+        super().__init__(dir, transform)
+        self.depth = self.example['image'].shape[3]
+    
+    def pick(self, d):
+        x, y = self.example['image'], self.example['label']
+        return {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
 
-class BackDim(object):
-    """Adds a singleton dimension at the end of a numpy array.
+class NdarrayDatasetPatch(NdarrayDatasetSplit):
+    """Splits the arrays into patches along spatial dimensions.
+    
+    Patches have 1/2 overlap.
     """
-    def __init__(self, both = False):
-        self.both = both
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-        image = np.expand_dims(image, axis = len(image.shape))
-        if self.both:
-            label = np.expand_dims(label, axis = len(label.shape))
-        
-        return {'image': image,
-                'label': label}
-        
-class Transpose3d(object):
-    """Transpose D x H x W x C to C x D x H x W.
-    """
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        # numpy image: H x W x D x C
-        # torch image: C x H x W x D
-        image = image.transpose(3, 0, 1, 2)
-        label = label.transpose(3, 0, 1, 2)
-        return {'image': image,
-                'label': label}
+    def __init__(self, dir, transform = None, patch_R = 8):
+        super().__init__(dir, transform)
+        self.patch_R = patch_R
+        self.depth = patch_R ** 3
+        self.size = (np.array(self.example['image'].shape[1:4]) 
+            // patch_R)
+    
+    def pick(self, d):
+        """d is a base (patch_R * (patch_R - 1)) number with
+        length 3. Each digit is the starting point of the patch
+        in each dimension.
+        """
+        x, y = self.example['image'], self.example['label']
+        d1, d = d % self.patch_R, d // self.patch_R
+        d2, d3 = d % self.patch_R, d // self.patch_R
+        d1 *= self.size[0]
+        d2 *= self.size[1]
+        d3 *= self.size[2]
+        slice = np.index_exp[:,d1:d1+self.size[0],
+                             d2:d2+self.size[1],
+                             d3:d3+self.size[2]]
+        return {'image': x[slice], 'label': y[slice]}

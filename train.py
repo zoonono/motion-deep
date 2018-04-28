@@ -1,103 +1,99 @@
+import numpy as np
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
-import numpy as np
-from model import VNet, DnCnn
-from data import *
 from torchvision import transforms
+
+from data import *
+from model import *
+from transform import *
+
+from os import mkdir
+from os.path import exists, join
 import time
-import os
 
-exp_name = 'dncnn_d10'
-num_epochs = 3
-# test_every_i = 60 # epoch size is 128, test 2 times per epoch
-test_every_i = 5000 # epoch size is 15504
-display_every_i = 500
-batch_size = 1
-size = np.array((256, 256)) # originally (256, 256, 136)
-in_ch = 1 # 2 channels: real, imag
-t = transforms.Compose([PickChannel(0), ToTensor()]) # PickChannel(0), Decimate(axes = (1, 2, 3)), Patcher((32,32,32))
+def main():
+    if torch.cuda.is_available():
+        torch.cuda.set_device(2)
 
-# net = VNet(size, in_ch = in_ch)
-net = DnCnn(size, 10, in_ch = in_ch)
-
-losses = np.array([0.0, 0.0])
-train_loss, test_loss = 0.0, 0.0
-save_dir = 'output/'
-if not(os.path.exists(save_dir)):
-    os.mkdir(save_dir)
+    num_epochs = 9
+    load = False
+    t = transforms.Compose([RealImag(), PickChannel(0), Decimate(),
+                            Residual(), ToTensor()])
     
-# net.load_state_dict(torch.load(save_dir + 'model_' + exp_name + '.pth'))
-# losses = np.load(save_dir + 'loss_' + exp_name + '.npy')
-
-criterion = torch.nn.MSELoss()
-optimizer = optim.Adam(net.parameters())
-
-filenames = GenericFilenames('../motion_data_resid_full/', 'motion_corrupt_',
-                             'motion_resid_', '.npy', 128) # Assumes images start as C x H x W x D
-train_filenames, test_filenames = filenames.split((0.9453125, 0.0546875))
-train = MotionCorrDataset(train_filenames, lambda x: np.load(x), transform = t)
-test = MotionCorrDataset(test_filenames, lambda x: np.load(x), transform = t)
-
-train, test = Splitter(train, depth = 136), Splitter(test, depth = 136)
-
-def compute_loss(dataset, criterion):
-    avg = 0.0
-    for i, example in enumerate(dataset):
-        image, label = example['image'], example['label']
-        image, label = Variable(image.cuda()), Variable(label.cuda())
-        image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
-        output = net(image)
-        avg += (criterion(output, label).data[0] - avg) / (i + 1)
-    return avg
-
-torch.cuda.set_device(1)
-net.cuda()
+#    name = 'dncnn_mag_patch32'
+#    name = 'dncnn_phase_patch32'
+#    train = NdarrayDatasetPatch('../data-npy/train', transform = t)
+#    test = NdarrayDatasetPatch('../data-npy/test', transform = t)
+#    name = 'dncnn_mag_256'
+#    name = 'dncnn_phase_256'
+#    name = 'dncnn_mag_128'
+    name = 'dncnn_real_128'
+    train = NdarrayDataset2d('../data-npy/train', transform = t)
+    test = NdarrayDataset2d('../data-npy/test', transform = t)
     
-print('Beginning Training...')
-total_start_time = time.time()
-for epoch in range(num_epochs):
-
-    train_loss = 0.0
-    train.shuffle()
+    #####
+    example = train[0]['image'] # C x H x W
+    in_size = example.shape[1:]
+    in_ch = example.shape[0]
+    test_every_i = len(train) // 2
+    display_every_i = len(train) // 10
     
-    image_batch, label_batch = None, None
-    for i, example in enumerate(train):
-        start_time = time.time()
-
-        image, label = example['image'], example['label']
-        image, label = Variable(image.cuda()), Variable(label.cuda())
-        image, label = image.unsqueeze(0), label.unsqueeze(0) # add batch dim
+    net = DnCnn(in_size, in_ch)
+    criterion = torch.nn.MSELoss()
+    optimizer = optim.Adam(net.parameters())
+    
+    losses = None
+    if not exists(name):
+        mkdir(name)
+    if load:
+        net.load_state_dict(torch.load(join(name, 'model.pth')))
+        losses = np.load(join(name, 'losses.npy'))
+    
+    if torch.cuda.is_available():
+        net.cuda()
+    
+    print('Beginning Training...')
+    print('Epochs:', num_epochs)
+    print('Examples per epoch:', len(train))
+    total_time = time.time()
+    for epoch in range(num_epochs):
+        train_loss, test_loss = 0.0, 0.0
+        train.shuffle()
         
-        if image_batch is None:
-            image_batch, label_batch = image, label
-        else:
-            image_batch = torch.cat((image_batch, image), 0)
-            label_batch = torch.cat((label_batch, label), 0)
-        if i % batch_size == batch_size - 1:
+        for i, example in enumerate(train):        
+            image, label = example['image'], example['label']
+            if torch.cuda.is_available():
+                image, label = image.cuda(), label.cuda()
+            image = Variable(image).unsqueeze(0)
+            label = Variable(label).unsqueeze(0)
+                    
             optimizer.zero_grad()
-
-            output = net(image_batch)
-            loss = criterion(output, label_batch)     
+            output = net(image)
+            loss = criterion(output, label)
             loss.backward()
             optimizer.step()
             
-            image_batch, label_batch = None, None
-            
-            # train_loss is a moving avg, so it lags behind test_loss
-            train_loss += (loss.data[0] - train_loss) / (i % display_every_i + 1)
+            train_loss += ((loss.data[0] - train_loss)
+                           / (i % test_every_i + 1))
             if i % test_every_i == test_every_i - 1:
-                test_loss = compute_loss(test, criterion)
-                print('[%d, %5d] Training loss: %.3f, Test loss: %.3f, Time: %.3f' %
-                      (epoch + 1, i + 1, train_loss, test_loss, time.time() - start_time))
-                losses = np.vstack((losses, [train_loss, test_loss]))
+                test_loss = compute_loss(test, criterion, net)
+                if losses is None:
+                    losses = np.array([train_loss, test_loss])
+                else:
+                    losses = np.vstack((losses, 
+                        [train_loss, test_loss]))
+                print(('[%d, %5d] Training loss: %.3f, ' 
+                    % (epoch + 1, i + 1, train_loss))
+                    + ('Test loss: %.3f, Time: %.3f'
+                    % (test_loss, time.time() - total_time)))
                 train_loss = 0.0
-            elif i % display_every_i == display_every_i - 1:
-                print(train_loss, time.time() - start_time)
-                losses = np.vstack((losses, [train_loss, test_loss]))
-                train_loss = 0.0
-            elif i == 0:
-                print(train_loss, time.time() - start_time)
-    torch.save(net.state_dict(), save_dir + 'model_' + exp_name + '.pth')
-    np.save(save_dir + 'loss_' + exp_name + '.npy', losses)
-print('Finished Training; Time Elapsed:',  time.time() - total_start_time)
+            if i % display_every_i == 0:
+                print('[%d] Training loss: %.3f, Time: %3f' 
+                    % (i + 1, train_loss, time.time() - total_time))
+        torch.save(net.state_dict(), join(name, 'model.pth'))
+        np.save(join(name, 'losses.npy'), losses)
+    print('Time elapsed: %.3f' % (time.time() - total_time))
+
+if __name__ == '__main__':
+    main()
