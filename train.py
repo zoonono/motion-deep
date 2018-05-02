@@ -14,24 +14,30 @@ import time
 
 def main():
     if torch.cuda.is_available():
-        torch.cuda.set_device(2)
+        torch.cuda.set_device(3)
 
-    num_epochs = 9
+    num_epochs = 4
     load = False
-    t = transforms.Compose([RealImag(), PickChannel(0), Decimate(),
-                            Residual(), ToTensor()])
+    t = transforms.Compose([MagPhase(), PickChannel(0),
+                            Residual(), ToTensor()]) #Decimate()
     
 #    name = 'dncnn_mag_patch32'
 #    name = 'dncnn_phase_patch32'
 #    train = NdarrayDatasetPatch('../data-npy/train', transform = t)
 #    test = NdarrayDatasetPatch('../data-npy/test', transform = t)
-#    name = 'dncnn_mag_256'
+    name = 'dncnn_mag_256'
+    name += '_d40'
+#    name += '_l1'
+#    name += '_smooth'
 #    name = 'dncnn_phase_256'
 #    name = 'dncnn_mag_128'
-    name = 'dncnn_real_128'
+#    name = 'dncnn_real_128'
+#    name = 'dncnn_nores_mag_256'
     train = NdarrayDataset2d('../data-npy/train', transform = t)
     test = NdarrayDataset2d('../data-npy/test', transform = t)
     
+    criterion = torch.nn.MSELoss() #(Smooth)L1Loss(), MSELoss()
+    depth = 40 #20
     #####
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
@@ -39,8 +45,7 @@ def main():
     test_every_i = len(train) // 2
     display_every_i = len(train) // 10
     
-    net = DnCnn(in_size, in_ch)
-    criterion = torch.nn.MSELoss()
+    net = DnCnn(in_size, in_ch, depth = depth)
     optimizer = optim.Adam(net.parameters())
     
     losses = None
