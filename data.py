@@ -62,6 +62,11 @@ class NdarrayDatasetSplit(NdarrayDataset):
         return self.pick(d)
     
     def pick(self, d):
+        x, y = self.example['image'], self.example['label']
+        s = self.slice(d)
+        return {'image': x[s], 'label': y[s]}
+       
+    def slice(self, d):
         raise NotImplementedError
         
 class NdarrayDataset2d(NdarrayDatasetSplit):
@@ -70,9 +75,8 @@ class NdarrayDataset2d(NdarrayDatasetSplit):
         super().__init__(dir, transform)
         self.depth = self.example['image'].shape[3]
     
-    def pick(self, d):
-        x, y = self.example['image'], self.example['label']
-        return {'image': x[:,:,:,d], 'label': y[:,:,:,d]}
+    def slice(self, d):
+        return np.index_exp[:,:,:,d]
 
 class NdarrayDatasetPatch(NdarrayDatasetSplit):
     """Splits the arrays into patches along spatial dimensions.
@@ -86,18 +90,16 @@ class NdarrayDatasetPatch(NdarrayDatasetSplit):
         self.size = (np.array(self.example['image'].shape[1:4]) 
             // patch_R)
     
-    def pick(self, d):
+    def slice(self, d):
         """d is a base (patch_R * (patch_R - 1)) number with
         length 3. Each digit is the starting point of the patch
         in each dimension.
         """
-        x, y = self.example['image'], self.example['label']
         d1, d = d % self.patch_R, d // self.patch_R
         d2, d3 = d % self.patch_R, d // self.patch_R
         d1 *= self.size[0]
         d2 *= self.size[1]
         d3 *= self.size[2]
-        slice = np.index_exp[:,d1:d1+self.size[0],
-                             d2:d2+self.size[1],
-                             d3:d3+self.size[2]]
-        return {'image': x[slice], 'label': y[slice]}
+        return np.index_exp[:,d1:d1+self.size[0],
+                            d2:d2+self.size[1],
+                            d3:d3+self.size[2]]

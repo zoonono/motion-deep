@@ -14,30 +14,30 @@ import time
 
 def main():
     if torch.cuda.is_available():
-        torch.cuda.set_device(3)
+        torch.cuda.set_device(0)
 
-    num_epochs = 4
-    load = False
+    num_epochs = 5
+    load = True
     t = transforms.Compose([MagPhase(), PickChannel(0),
-                            Residual(), ToTensor()]) #Decimate()
+                            ToTensor()]) #Residual(), Decimate()
     
 #    name = 'dncnn_mag_patch32'
 #    name = 'dncnn_phase_patch32'
 #    train = NdarrayDatasetPatch('../data-npy/train', transform = t)
 #    test = NdarrayDatasetPatch('../data-npy/test', transform = t)
-    name = 'dncnn_mag_256'
-    name += '_d40'
+#    name = 'dncnn_mag_256'
+#    name += '_d40'
 #    name += '_l1'
 #    name += '_smooth'
 #    name = 'dncnn_phase_256'
 #    name = 'dncnn_mag_128'
 #    name = 'dncnn_real_128'
-#    name = 'dncnn_nores_mag_256'
+    name = 'dncnn_nores_mag_256'
     train = NdarrayDataset2d('../data-npy/train', transform = t)
     test = NdarrayDataset2d('../data-npy/test', transform = t)
     
     criterion = torch.nn.MSELoss() #(Smooth)L1Loss(), MSELoss()
-    depth = 40 #20
+    depth = 20
     #####
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
@@ -52,6 +52,7 @@ def main():
     if not exists(name):
         mkdir(name)
     if load:
+        print("Loading model: " + name)
         net.load_state_dict(torch.load(join(name, 'model.pth')))
         losses = np.load(join(name, 'losses.npy'))
     
