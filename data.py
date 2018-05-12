@@ -72,14 +72,13 @@ class NdarrayDatasetSplit(NdarrayDataset):
     def slice(self, d):
         raise NotImplementedError
         
-class NdarrayDataset2d2d(NdarrayDatasetSplit):
+class NiiDataset2d(NdarrayDatasetSplit):
     """Splits the array by both D and E dimensions."""
     def __init__(self, dir, transform = None):
         def read(filename):
             slash = filename.rfind('/')
             img = (filename[:slash] + "/image" + filename[slash:-4] + 
                    '_M' + filename[-4:])
-            print(filename, img)
             image = np.array(nib.load(img).get_data())
             label = np.array(nib.load(filename).get_data())
             return image, label
@@ -90,7 +89,6 @@ class NdarrayDataset2d2d(NdarrayDatasetSplit):
     
     def slice(self, d):
         dd, de = d % self.d, d // self.d
-        print(dd, de)
         return np.index_exp[:,:,:,dd,de]
 
 class NdarrayDataset2d(NdarrayDatasetSplit):

@@ -2,11 +2,10 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
-from torchvision import transforms
 
-from data import *
-from model import *
-from transform import *
+from model import DnCnn
+from options import load_options
+from functions import compute_loss
 
 from os import mkdir
 from os.path import exists, join
@@ -16,7 +15,7 @@ import time
 class Logger(object):
     def __init__(self, filename="Default.log"):
         self.terminal = sys.stdout
-        self.log = open(filename, "a")
+        self.log = open(filename, "a+")
 
     def write(self, message):
         self.terminal.write(message)
@@ -24,33 +23,18 @@ class Logger(object):
 
 def main():
     if torch.cuda.is_available():
-        torch.cuda.set_device(1)
+        torch.cuda.set_device(0)
 
     num_epochs = 3
-    load = True
-    t = transforms.Compose([MagPhase(), PickChannel(0),
-                            Residual(), ToTensor()]) #Decimate()
+    load = False
     
-#    name = 'dncnn_mag_patch32'
-#    name = 'dncnn_phase_patch32'
-#    train = NdarrayDatasetPatch('../data-npy/train', transform = t)
-#    test = NdarrayDatasetPatch('../data-npy/test', transform = t)
-    name = 'dncnn_mag_256'
-    name += '_d40'
-#    name += '_l1'
-#    name += '_smooth'
-#    name = 'dncnn_phase_256'
-#    name = 'dncnn_mag_128'
-#    name = 'dncnn_real_128'
-#    name = 'dncnn_nores_mag_256'
-    train = NdarrayDataset2d('../data-npy/train', transform = t)
-    test = NdarrayDataset2d('../data-npy/test', transform = t)
-    
-    criterion = torch.nn.MSELoss() #(Smooth)L1Loss(), MSELoss()
-    depth = 40
+    name = 'dncnn_smallmotion'
+    options = load_options(name)
+    train = options['train']
+    test = options['test']
+    criterion = options['criterion']
+    depth = options['depth']
     #####
-    sys.stdout = Logger(join(name, "log.txt"))
-    
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
     in_ch = example.shape[0]
@@ -71,6 +55,7 @@ def main():
     if torch.cuda.is_available():
         net.cuda()
     
+    sys.stdout = Logger(join(name, "log.txt"))
     print('Beginning Training...')
     print('Epochs:', num_epochs)
     print('Examples per epoch:', len(train))
