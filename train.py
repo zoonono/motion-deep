@@ -22,13 +22,13 @@ class Logger(object):
         self.log.write(message)
 
 def main():
+    name = 'dncnn_smallm_twoch'
     if torch.cuda.is_available():
-        torch.cuda.set_device(0)
+        torch.cuda.set_device(2)
 
     num_epochs = 3
     load = False
     
-    name = 'dncnn_smallm_twoch'
     options = load_options(name)
     train = options['train']
     test = options['test']

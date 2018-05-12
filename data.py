@@ -79,8 +79,8 @@ class NiiDataset2d(NdarrayDatasetSplit):
             slash = filename.rfind('/')
             img = (filename[:slash] + "/image" + filename[slash:-4] + 
                    '_M' + filename[-4:])
-            image = np.array(nib.load(img).get_data())
-            label = np.array(nib.load(filename).get_data())
+            image = nib.load(img).get_data().__array__()
+            label = nib.load(filename).get_data().__array__()
             return image, label
         super().__init__(dir, transform = transform, read = read)
         self.d = self.example['image'].shape[3]
