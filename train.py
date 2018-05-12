@@ -28,7 +28,7 @@ def main():
     num_epochs = 3
     load = False
     
-    name = 'dncnn_smallmotion'
+    name = 'dncnn_smallm_twoch'
     options = load_options(name)
     train = options['train']
     test = options['test']
