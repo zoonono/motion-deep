@@ -92,15 +92,14 @@ def save(example, suffix = ''):
 
 t = transforms.Compose([MagPhase(), PickChannel(0),
                         Residual(), ToTensor()])
-name = 'dncnn_mag_256_d40'
-depth = 40
+name = 'dncnn_mag_256_smooth'
 
 dataset = NdarrayDataset2d('../data-npy/test', transform = t)
 example = dataset[0]['image'] # C x H x W
 in_size = example.shape[1:]
 in_ch = example.shape[0]
 
-net = DnCnn(in_size, in_ch, depth = depth)
+net = DnCnn(in_size, in_ch)
 net.load_state_dict(torch.load(join(name, 'model.pth'), 
                     map_location=lambda storage, loc: storage))
 test = NdarrayPred(dataset, net)

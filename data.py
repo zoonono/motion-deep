@@ -1,9 +1,12 @@
+import nibabel as nib
 import numpy as np
 
 import random
 from fnmatch import fnmatch
 from os import listdir
 from os.path import join
+
+from transform import RealImag
 
 class NdarrayDataset:
     """Loads data saved as ndarrays in .npy files using np.save(...).
@@ -14,10 +17,12 @@ class NdarrayDataset:
         C: channel
         H, W, D: spatial dimensions
     """
-    def __init__(self, dir, transform = None):
+    def __init__(self, dir, transform = None, read = np.load):
         self.dir = dir
-        self.files = [f for f in listdir(dir) if fnmatch(f, '*.npy')]
+        self.files = [f for f in listdir(dir) 
+                      if (fnmatch(f, '*.npy') or fnmatch(f, '*.nii'))]
         self.transform = transform
+        self.read = read
     
     def __len__(self):
         return len(self.files)
@@ -30,14 +35,12 @@ class NdarrayDataset:
             yield self[i]
     
     def load(self, filename):
-        x, y = np.load(filename)
+        x, y = self.read(filename)
         example = {'image': x, 'label': y}
         if self.transform:
             example = self.transform(example)
-        if len(example['image'].shape) == 3:
-            x, y = example['image'], example['label']
-            example = {'image': x[None,:,:,:], 
-                       'label': y[None,:,:,:]}
+        else:
+            example = RealImag()(example)
         return example
     
     def shuffle(self):
@@ -45,8 +48,8 @@ class NdarrayDataset:
 
 class NdarrayDatasetSplit(NdarrayDataset):
     """Splits the arrays somehow (abstract class)."""
-    def __init__(self, dir, transform = None):
-        super().__init__(dir, transform)
+    def __init__(self, dir, transform = None, read = np.load):
+        super().__init__(dir, transform = transform, read = read)
         self.i = 0
         self.example = super().__getitem__(self.i)
         self.depth = None
@@ -69,10 +72,31 @@ class NdarrayDatasetSplit(NdarrayDataset):
     def slice(self, d):
         raise NotImplementedError
         
+class NdarrayDataset2d2d(NdarrayDatasetSplit):
+    """Splits the array by both D and E dimensions."""
+    def __init__(self, dir, transform = None):
+        def read(filename):
+            slash = filename.rfind('/')
+            img = (filename[:slash] + "/image" + filename[slash:-4] + 
+                   '_M' + filename[-4:])
+            print(filename, img)
+            image = np.array(nib.load(img).get_data())
+            label = np.array(nib.load(filename).get_data())
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.d = self.example['image'].shape[3]
+        self.e = self.example['image'].shape[4]
+        self.depth = (self.d * self.e)
+    
+    def slice(self, d):
+        dd, de = d % self.d, d // self.d
+        print(dd, de)
+        return np.index_exp[:,:,:,dd,de]
+
 class NdarrayDataset2d(NdarrayDatasetSplit):
     """Splits the arrays by the D dimension."""
     def __init__(self, dir, transform = None):
-        super().__init__(dir, transform)
+        super().__init__(dir, transform = transform)
         self.depth = self.example['image'].shape[3]
     
     def slice(self, d):
@@ -84,7 +108,7 @@ class NdarrayDatasetPatch(NdarrayDatasetSplit):
     Patches have 1/2 overlap.
     """
     def __init__(self, dir, transform = None, patch_R = 8):
-        super().__init__(dir, transform)
+        super().__init__(dir, transform = transform)
         self.patch_R = patch_R
         self.depth = patch_R ** 3
         self.size = (np.array(self.example['image'].shape[1:4]) 
