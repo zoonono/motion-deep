@@ -22,19 +22,30 @@ class Logger(object):
         self.log.write(message)
 
 def main():
-    name = 'dncnn_smallm_twoch'
+    if len(sys.argv) not in (4, 5):
+        print('Arguments:')
+        print('1: Name of experiment (must be defined in options.py)')
+        print('2: Num epochs')
+        print('3: Load existing?')
+        print('4 (optional): Cuda device number')
+        print('Example:')
+        print('python3 train.py dncnn_smallm_mag 3 False 0')
+        return
+    name = sys.argv[1]
+    num_epochs = int(sys.argv[2])
+    load = sys.argv[3].lower() in ('true', 'yes', 't', '1')
     if torch.cuda.is_available():
-        torch.cuda.set_device(2)
-
-    num_epochs = 3
-    load = False
+        if len(sys.argv) == 5:
+            torch.cuda.set_device(int(sys.argv[4]))
+        torch.cuda.set_device(0)
     
+    #####
     options = load_options(name)
     train = options['train']
     test = options['test']
     criterion = options['criterion']
     depth = options['depth']
-    #####
+    
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
     in_ch = example.shape[0]
