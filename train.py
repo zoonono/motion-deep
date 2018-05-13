@@ -37,7 +37,8 @@ def main():
     if torch.cuda.is_available():
         if len(sys.argv) == 5:
             torch.cuda.set_device(int(sys.argv[4]))
-        torch.cuda.set_device(0)
+        else:
+            torch.cuda.set_device(0)
     
     #####
     options = load_options(name)
@@ -68,6 +69,7 @@ def main():
     
     sys.stdout = Logger(join(name, "log.txt"))
     print('Beginning Training...')
+    print('Name:', name)
     print('Epochs:', num_epochs)
     print('Examples per epoch:', len(train))
     total_time = time.time()
