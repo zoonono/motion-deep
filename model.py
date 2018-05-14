@@ -9,12 +9,13 @@ from functions import *
 class DnCnn(nn.Module):
     """Implements the DnCNN architecture: https://arxiv.org/abs/1608.03981
     """
-    def __init__(self, in_size, in_ch, depth = 20, kernel = 3):
+    def __init__(self, in_size, in_ch, depth = 20, kernel = 3, dropprob = 0.0):
         super().__init__()
         self.in_size = np.array(in_size)
         self.in_ch = in_ch
         self.depth = depth
         self.kernel = kernel
+        self.dropprob = 0.0
         
         if len(in_size) == 2:
             self.dim = '2d'
@@ -39,6 +40,10 @@ class DnCnn(nn.Module):
                  nn.PReLU(num_parameters = 64)]))
         self.convf = conv_padded(64, self.in_ch, self.kernel, 1,
             self.in_size, self.in_size, dim = self.dim)
+        if self.dim == '2d':
+            self.dropout = nn.Dropout2d(p = self.dropprob)
+        else:
+            self.dropout = nn.Dropout3d(p = self.dropprob)
             
     def forward(self, x):
         """Defines one forward pass given input x."""
@@ -47,7 +52,7 @@ class DnCnn(nn.Module):
             conv = getattr(self, "conv" + str(i))
             post = getattr(self, "post" + str(i))
             x = post(x + conv(x))
-        x = self.convf(x)
+        x = self.dropout(self.convf(x))
         return x
     
     def double(self):

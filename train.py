@@ -46,6 +46,7 @@ def main():
     test = options['test']
     criterion = options['criterion']
     depth = options['depth']
+    dropprob = options['dropprob']
     
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
@@ -53,7 +54,7 @@ def main():
     test_every_i = len(train) // 2
     display_every_i = len(train) // 10
     
-    net = DnCnn(in_size, in_ch, depth = depth)
+    net = DnCnn(in_size, in_ch, depth = depth, dropprob = dropprob)
     optimizer = optim.Adam(net.parameters())
     
     losses = None
@@ -61,7 +62,11 @@ def main():
         mkdir(name)
     if load:
         print("Loading model: " + name)
-        net.load_state_dict(torch.load(join(name, 'model.pth')))
+        if torch.cuda.is_available():
+            net.load_state_dict(torch.load(join(name, 'model.pth')))
+        else:
+            net.load_state_dict(torch.load(join(name, 'model.pth'), 
+                    map_location=lambda storage, loc: storage))
         losses = np.load(join(name, 'losses.npy'))
     
     if torch.cuda.is_available():
