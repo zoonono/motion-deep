@@ -12,16 +12,15 @@ class CombinedDataset:
     def __init__(self, d1, d2):
         self.d1 = d1
         self.d2 = d2
-        self.sample_indices = [i for i in range(len(self))]
     
     def __len__(self):
         return len(self.d1) + len(self.d2)
     
     def shuffle(self):
-        random.shuffle(self.sample_indices)
+        self.d1.shuffle()
+        self.d2.shuffle()
     
     def __getitem__(self, i):
-        i = self.sample_indices[i]
         if i < len(self.d1):
             return self.d1[i]
         return self.d2[i - len(self.d1)]
