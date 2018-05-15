@@ -37,5 +37,17 @@ def load_options(name):
         criterion = torch.nn.MSELoss()
         depth = 20
         dropprob = 0.5
+    elif name == 'dncnn_smallm_mag_8and16':
+        """Includes both 8echo and 16echo data"""
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train1 = NiiDataset2d('../data/8echo/train', transform = t)
+        test1 = NiiDataset2d('../data/8echo/test', transform = t)
+        train2 = NiiDataset2d('../data/16echo/train', transform = t)
+        test2 = NiiDataset2d('../data/16echo/test', transform = t)
+        train = CombinedDataset(train1, train2)
+        test = CombinedDataset(test1, test2)
+        criterion = torch.nn.MSELoss()
+        depth = 20
+        dropprob = 0.0
     return {'train': train, 'test': test, 
             'criterion': criterion, 'depth': depth, 'dropprob': dropprob}

@@ -8,6 +8,28 @@ from os.path import join
 
 from transform import RealImag
 
+class CombinedDataset:
+    def __init__(self, d1, d2):
+        self.d1 = d1
+        self.d2 = d2
+        self.sample_indices = [i for i in range(len(self))]
+    
+    def __len__(self):
+        return len(self.d1) + len(self.d2)
+    
+    def shuffle(self):
+        random.shuffle(self.sample_indices)
+    
+    def __getitem__(self, i):
+        i = self.sample_indices[i]
+        if i < len(self.d1):
+            return self.d1[i]
+        return self.d2[i - len(self.d1)]
+    
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
 class NdarrayDataset:
     """Loads data saved as ndarrays in .npy files using np.save(...).
     
