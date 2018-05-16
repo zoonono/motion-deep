@@ -61,7 +61,7 @@ def load_options(name):
         train = NiiDataset2d('../data/8echo/train', transform = t)
         test = NiiDataset2d('../data/8echo/test', transform = t)
         criterion = torch.nn.MSELoss()
-        depth = 20
+        depth = 4
         dropprob = 0.0
         model = UNet
     return {'train': train, 'test': test, 'criterion': criterion, 
