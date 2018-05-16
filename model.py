@@ -1,10 +1,7 @@
-import torch
 import torch.nn as nn
 import numpy as np
 
-from math import ceil
-
-from functions import *
+from functions import conv_padded, conv_padded_t, MultiModule, concat, double_weight_2d
 
 class DnCnn(nn.Module):
     """Implements the DnCNN architecture: https://arxiv.org/abs/1608.03981
@@ -69,16 +66,80 @@ class DnCnn(nn.Module):
             if key.startswith('conv') and key.endswith('weight'):
                 dict[key] = double_weight_2d(dict[key])
 
-class VNet(nn.Module):
-    """Implements the V-Net architecture: https://arxiv.org/abs/1606.04797
+class UNet(nn.Module):
+    """Implements the U-Net architecture: https://arxiv.org/abs/1505.04597
     """
-    def __init__(self, in_size, in_ch, depth = 5, kernel = 2):
+    def __init__(self, in_size, in_ch, depth = 4, kernel = 3, dropprob = 0.0):
         super().__init__()
         self.in_size = np.array(in_size)
         self.in_ch = in_ch
-        self.depth = 5
+        self.depth = depth
+        self.kernel = kernel
+        self.dropprob = dropprob
+        
+        if len(in_size) == 2:
+            self.dim = '2d'
+        elif len(in_size) == 3:
+            self.dim = '3d'
+        else:
+            assert False, 'Input ' + str(in_size) + ' must be 2d or 3d'
+        
+        self.init_layers()
+    
+    def init_layers(self):
+        def unet_module(ch, out_ch, size):
+            # print(ch, size)
+            conv1 = conv_padded(ch, out_ch, self.kernel, 1, size, size, 
+                                dim = self.dim)
+            conv2 = conv_padded(out_ch, out_ch, self.kernel, 1, size, size,
+                                dim = self.dim)
+            return MultiModule((conv1, conv2))
         
         size = self.in_size
-        ch = 16
+        ch = 64
         
+        conv, ch = unet_module(self.in_ch, ch, size), ch
+        setattr(self, 'conv_d0', conv)
+        conv, size = conv_padded(ch, ch, 2, 2, size, size // 2, 
+                                 dim = self.dim), size // 2
+        setattr(self, 'conv2_d0', conv)
+        for i in range(1, self.depth):
+            conv, ch = unet_module(ch, ch * 2, size), ch * 2
+            setattr(self, 'conv_d' + str(i), conv)
+            conv, size = conv_padded(ch, ch, 2, 2, size, size // 2, 
+                                     dim = self.dim), size // 2
+            setattr(self, 'conv2_d' + str(i), conv)
+        self.conv_m0, ch = unet_module(ch, ch * 2, size), ch * 2
+        # ch does not change due to feature forwarding
+        self.conv2_m0, size = conv_padded_t(ch, ch // 2, 2, 2, size,
+                                            size * 2, dim = self.dim), size * 2
+        for i in range(0, self.depth):
+            conv, ch = unet_module(ch, ch // 2, size), ch // 2
+            setattr(self, 'conv_u' + str(i), conv)
+            if i != self.depth - 1: # last layer is different
+                conv, size = conv_padded_t(ch, ch // 2, 2, 2, size, 
+                                           size * 2, dim = self.dim), size * 2
+                setattr(self, 'conv2_u' + str(i), conv)
+        conv = conv_padded(ch, self.in_ch, 1, 1, size, size, dim = self.dim) 
+        setattr(self, 'conv2_u' + str(self.depth - 1), conv)
+        if self.dim == '2d':
+            self.dropout = nn.Dropout2d(p = self.dropprob)
+        else:
+            self.dropout = nn.Dropout3d(p = self.dropprob)
+    
+    def forward(self, x):
+        features = []        
+        for i in range(self.depth):
+            conv = getattr(self, 'conv_d' + str(i))
+            post = getattr(self, 'conv2_d' + str(i))
+            x = conv(x)
+            features.append(x)
+            x = post(x)
+        x = self.conv2_m0(self.conv_m0(x))
+        for i in range(self.depth):
+            conv = getattr(self, 'conv_u' + str(i))
+            post = getattr(self, 'conv2_u' + str(i))
+            x = post(conv(concat(x, features[self.depth - i - 1])))
+        x = self.dropout(x)
+        return x
         

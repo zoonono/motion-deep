@@ -3,11 +3,10 @@ from matplotlib import pyplot as plt
 import torch
 from torch.autograd import Variable
 
-from data import *
-from transform import *
-from model import *
+from options import load_options
 
 from os.path import join
+import sys
 
 class NdarrayPred:
     """Loads data from NdarrayDataset and applies model.
@@ -27,6 +26,8 @@ class NdarrayPred:
     def __getitem__(self, i):
         example = self.dataset[i]
         x, y = example['image'], example['label']
+        if torch.cuda.is_available():
+            x, y = x.cuda(), y.cuda()
         x = Variable(x).unsqueeze(0)
         y = Variable(y).unsqueeze(0)
         yp = self.net(x)
@@ -85,27 +86,49 @@ def view(example, d):
     plt.imshow(image-pred)
     plt.show()
 
+def view_losses(losses):
+    plt.plot(losses[:,0], '-b')
+    plt.plot(losses[:,1], '-r')
+    plt.show()
+
 def save(example, suffix = ''):
     np.save(join(name, 'image' + suffix), example['image'])
     np.save(join(name, 'label' + suffix), example['label'])
     np.save(join(name, 'pred' + suffix), example['pred'])
 
-t = transforms.Compose([MagPhase(), PickChannel(0),
-                        Residual(), ToTensor()])
-name = 'dncnn_mag_256_smooth'
+if len(sys.argv) not in (2, 3):
+    print('Arguments:')
+    print('1: Name of experiment (must be defined in options.py)')
+    print('2 (optional): Cuda device number')
+    print('Example:')
+    print('python3 test.py dncnn_smallm_mag 0')
+    exit()
 
-dataset = NdarrayDataset2d('../data-npy/test', transform = t)
-example = dataset[0]['image'] # C x H x W
+name = sys.argv[1]
+options = load_options(name)
+train = options['train']
+test = options['test']
+criterion = options['criterion']
+depth = options['depth']
+model = options['model']
+# dropprob = options['dropprob'] # no dropout in testing
+
+example = train[0]['image'] # C x H x W
 in_size = example.shape[1:]
 in_ch = example.shape[0]
+    
+net = model(in_size, in_ch, depth = depth)
+if len(sys.argv) == 2 and torch.cuda.is_available():
+    torch.cuda.set_device(int(sys.argv[2]))
+    net.load_state_dict(torch.load(join(name, 'model.pth')))
+    net.cuda()
+else:
+    net.load_state_dict(torch.load(join(name, 'model.pth'), 
+                        map_location=lambda storage, loc: storage))
+losses = np.load(join(name, 'losses.npy'))
 
-net = DnCnn(in_size, in_ch)
-net.load_state_dict(torch.load(join(name, 'model.pth'), 
-                    map_location=lambda storage, loc: storage))
-test = NdarrayPred(dataset, net)
+pred = NdarrayPred(test, net)
 
-plt.gray()
-
-#example = test[0]
+#example = pred[0]
 #save(example, suffix = '_0')
         

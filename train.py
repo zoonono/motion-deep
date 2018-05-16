@@ -3,7 +3,6 @@ import torch
 from torch.autograd import Variable
 import torch.optim as optim
 
-from model import DnCnn
 from options import load_options
 from functions import compute_loss
 
@@ -47,6 +46,7 @@ def main():
     criterion = options['criterion']
     depth = options['depth']
     dropprob = options['dropprob']
+    model = options['model']
     
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
@@ -54,7 +54,7 @@ def main():
     test_every_i = len(train) // 2
     display_every_i = len(train) // 10
     
-    net = DnCnn(in_size, in_ch, depth = depth, dropprob = dropprob)
+    net = model(in_size, in_ch, depth = depth, dropprob = dropprob)
     optimizer = optim.Adam(net.parameters())
     
     losses = None

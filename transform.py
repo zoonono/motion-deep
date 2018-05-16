@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.signal import decimate
 import torch
-from torchvision import transforms
 
 """Brain data should be saved as complex ndarrays (H x W x D) using 
 np.save(...). After applying transforms, the data should be torch
