@@ -1,7 +1,7 @@
 import torch.nn as nn
 import numpy as np
 
-from functions import conv_padded, conv_padded_t, MultiModule, concat, double_weight_2d
+from functions import conv_padded, conv_padded_t, MultiModule, concat, double_weight_2d, tile_add
 
 class DnCnn(nn.Module):
     """Implements the DnCNN architecture: https://arxiv.org/abs/1608.03981
@@ -93,32 +93,37 @@ class UNet(nn.Module):
                                 dim = self.dim)
             conv2 = conv_padded(out_ch, out_ch, self.kernel, 1, size, size,
                                 dim = self.dim)
-            return MultiModule((conv1, conv2))
+            return MultiModule((conv1, nn.PReLU(num_parameters = out_ch), 
+                                conv2, nn.PReLU(num_parameters = out_ch)))
+        def post_module_down(ch, out_ch, size, out_size):
+            conv = conv_padded(ch, out_ch, 2, 2, size, out_size, 
+                               dim = self.dim)
+            return MultiModule((conv, nn.PReLU(num_parameters = out_ch)))
+        def post_module_up(ch, out_ch, size, out_size):
+            conv = conv_padded_t(ch, out_ch, 2, 2, size, out_size, 
+                                 dim = self.dim)
+            return MultiModule((conv, nn.PReLU(num_parameters = out_ch)))
         
         size = self.in_size
         ch = 64
         
         conv, ch = unet_module(self.in_ch, ch, size), ch
         setattr(self, 'conv_d0', conv)
-        conv, size = conv_padded(ch, ch, 2, 2, size, size // 2, 
-                                 dim = self.dim), size // 2
+        conv, size = post_module_down(ch, ch, size, size // 2), size // 2
         setattr(self, 'conv2_d0', conv)
         for i in range(1, self.depth):
             conv, ch = unet_module(ch, ch * 2, size), ch * 2
             setattr(self, 'conv_d' + str(i), conv)
-            conv, size = conv_padded(ch, ch, 2, 2, size, size // 2, 
-                                     dim = self.dim), size // 2
+            conv, size = post_module_down(ch, ch, size, size // 2), size // 2
             setattr(self, 'conv2_d' + str(i), conv)
         self.conv_m0, ch = unet_module(ch, ch * 2, size), ch * 2
         # ch does not change due to feature forwarding
-        self.conv2_m0, size = conv_padded_t(ch, ch // 2, 2, 2, size,
-                                            size * 2, dim = self.dim), size * 2
+        self.conv2_m0, size = post_module_up(ch, ch // 2, size, size * 2), size * 2
         for i in range(0, self.depth):
             conv, ch = unet_module(ch, ch // 2, size), ch // 2
             setattr(self, 'conv_u' + str(i), conv)
             if i != self.depth - 1: # last layer is different
-                conv, size = conv_padded_t(ch, ch // 2, 2, 2, size, 
-                                           size * 2, dim = self.dim), size * 2
+                conv, size = post_module_up(ch, ch // 2, size, size * 2), size * 2
                 setattr(self, 'conv2_u' + str(i), conv)
         conv = conv_padded(ch, self.in_ch, 1, 1, size, size, dim = self.dim) 
         setattr(self, 'conv2_u' + str(self.depth - 1), conv)
@@ -132,14 +137,15 @@ class UNet(nn.Module):
         for i in range(self.depth):
             conv = getattr(self, 'conv_d' + str(i))
             post = getattr(self, 'conv2_d' + str(i))
-            x = conv(x)
+            x = tile_add(x, conv(x))
             features.append(x)
             x = post(x)
-        x = self.conv2_m0(self.conv_m0(x))
+        x = self.conv2_m0(tile_add(x, self.conv_m0(x)))
         for i in range(self.depth):
             conv = getattr(self, 'conv_u' + str(i))
             post = getattr(self, 'conv2_u' + str(i))
-            x = post(conv(concat(x, features[self.depth - i - 1])))
+            x = tile_add(x, conv(concat(x, features[self.depth - i - 1])))
+            x = post(x)
         x = self.dropout(x)
         return x
         

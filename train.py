@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from torch.autograd import Variable
-import torch.optim as optim
 
 from options import load_options
 from functions import compute_loss
@@ -21,25 +20,29 @@ class Logger(object):
         self.log.write(message)
 
 def main():
-    if len(sys.argv) not in (4, 5):
+    if len(sys.argv) not in (4, 5, 6):
         print('Arguments:')
         print('1: Name of experiment (must be defined in options.py)')
         print('2: Num epochs')
         print('3: Load existing?')
         print('4 (optional): Cuda device number')
+        print('5 (optional): Babysit')
         print('Example:')
-        print('python3 train.py dncnn_smallm_mag 3 False 0')
+        print('python3 train.py dncnn_smallm_mag 3 False 0 False')
         return
     name = sys.argv[1]
     num_epochs = int(sys.argv[2])
     load = sys.argv[3].lower() in ('true', 'yes', 't', '1')
     if torch.cuda.is_available():
-        if len(sys.argv) == 5:
+        if len(sys.argv) >= 5:
             torch.cuda.set_device(int(sys.argv[4]))
         else:
             torch.cuda.set_device(0)
+    if len(sys.argv) == 6:
+        babysit = sys.argv[5].lower() in ('true', 'yes', 't', '1')
+    else:
+        babysit = False
     
-    #####
     options = load_options(name)
     train = options['train']
     test = options['test']
@@ -47,6 +50,7 @@ def main():
     depth = options['depth']
     dropprob = options['dropprob']
     model = options['model']
+    optimizer = options['optimizer']
     
     example = train[0]['image'] # C x H x W
     in_size = example.shape[1:]
@@ -55,7 +59,7 @@ def main():
     display_every_i = len(train) // 10
     
     net = model(in_size, in_ch, depth = depth, dropprob = dropprob)
-    optimizer = optim.Adam(net.parameters())
+    optimizer = optimizer(net.parameters())
     
     losses = None
     if not exists(name):
@@ -112,6 +116,8 @@ def main():
             if i % display_every_i == 0:
                 print('[%d] Training loss: %.3f, Time: %.3f' 
                     % (i + 1, train_loss, time.time() - total_time))
+            elif babysit:
+                print(train_loss)
         torch.save(net.state_dict(), join(name, 'model.pth'))
         np.save(join(name, 'losses.npy'), losses)
     print('Time elapsed: %.3f' % (time.time() - total_time))
