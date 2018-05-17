@@ -1,7 +1,9 @@
 import numpy as np
+import nufft
 from matplotlib import pyplot as plt
+import time
 
-def perlin_octave(length, min_f, weights = [.6**p for p in range(8)]):
+def perlin_octave(length, min_f, weights = [.6**p for p in range(3)]):
     total = np.zeros(length)
     for w in weights:
         total += w * perlin_noise(length, min_f)
@@ -53,40 +55,41 @@ def simulate_motion(img, dx, dy, dz, dphi, dtheta, dpsi, axes = 0):
     The order of axes matters: it is the order pts/lines/planes are taken.
     Example: Suppose img is rows x cols and points are taken left to right, 
         then top to bottom (like a book). Then, axes = (1, 0).
+    Close to this Matlab library: https://github.com/dgallichan/retroMoCoBox
     """
-    if len(axes) == 1:
-        axes = axes[0]
+    start = time.time()
+    if not isinstance(axes, (list, np.ndarray)):
+        axes = (axes,)
     
     # get helper data structures
     shape = np.array(img.shape)
     grid = np.mgrid[0:shape[0], 0:shape[1], 0:shape[2]]
-    center = np.tile((shape // 2).T, 
-        (1, int(np.prod([s for i, s in enumerate(shape) if i not in axes]))))
+    center = np.tile((shape // 2), (img.size // dx.size, 1)).transpose(1, 0)
     
     # Create list of coordinates sampled wrt time
     # Shape: (T x (1, 2, or 3, the number of fixed axes))
     # Example: if we sample planes in the y direction, time is (T x 1)
-    if not isinstance(axes, (list, np.ndarray)):
-        time = np.mgrid[0:shape[axes]]
+    if len(axes) == 1:
+        samp_pts = np.mgrid[0:shape[axes[0]]]
+    elif len(axes) == 2:
+        samp_pts = np.mgrid[0:shape[axes[0]], 0:shape[axes[1]]]
+    elif len(axes) == 3:
+        samp_pts = np.mgrid[0:shape[axes[0]], 0:shape[axes[1]], 0:shape[axes[2]]]
     else:
-        if len(axes) == 2:
-            time = np.mgrid[0:shape[axes[0]], 0:shape[axes[1]]]
-        elif len(axes) == 3:
-            time = np.mgrid[0:shape[axes[0]], 0:shape[axes[1]], 
-                            0:shape[axes[2]]]
-        else:
-            assert False, 'img should be 3D, so axes can maximally be length 3'
-        time = time.reshape(len(axes), time.size // len(axes)).transpose(1, 0)
+        assert False, 'img should be 3D, so axes can maximally be length 3'
+    samp_pts = samp_pts.reshape(len(axes), 
+                                samp_pts.size // len(axes)).transpose(1, 0)
     
     points = None
-    for i, pt in enumerate(time):
+    for i, pt in enumerate(samp_pts):
+        start2 = time.time()
         # get shifts
         rotation = rotation_matrix(dphi[i], dtheta[i], dpsi[i])
         dr = np.array([dx[i], dy[i], dz[i]])
         
         # get all points that were sampled at t = i
-        if not isinstance(axes, (list, np.ndarray)):
-            idx = np.index_exp[grid[axes] == pt]
+        if len(axes) == 1:
+            idx = np.index_exp[grid[axes[0]] == pt]
         elif len(axes) == 2:
             idx = np.index_exp[(grid[axes[0]] == pt[0]) &
                                (grid[axes[1]] == pt[1])]
@@ -103,26 +106,30 @@ def simulate_motion(img, dx, dy, dz, dphi, dtheta, dpsi, axes = 0):
             points = pts
         else:
             points = np.hstack((points, pts))
+        print(time.time() - start2)
+    points = points.astype(int)
+    points[0] = np.mod(points[0], shape[0])
+    points[1] = np.mod(points[1], shape[1])
+    points[2] = np.mod(points[2], shape[2])
     
-    # 4 neighbors in each direction, 1.5x oversampling in k-space
-    return nufft(img, points, shape, (4, 4, 4), 1.5 * shape)
-
-def nudft(points, function, kx, ky, kz, t = lambda x: x):
-    total = 0
-    for p in points:
-        p = t(p)
-        total += function(p) * np.exp(-1j * 2 * np.pi * 
-                         (p[0] * kx + p[1] * ky + p[2] * kz))
-    return total
+    vals = np.array([img[p[0], p[1], p[2]] for p in points.transpose(1, 0)])
+    print(time.time() - start)
+    start = time.time()
+    img_k =  nufft.nufft3d1(points[0], points[1], points[2], vals, 
+                          shape[0], shape[1], shape[2])
+    print(time.time() - start)
+    return img_k
 
 def test_simulate_motion(img, axes = 0):
-    length = int(np.prod([s for i, s in enumerate(img.shape) if i not in axes]))
+    if not isinstance(axes, (list, np.ndarray)):
+        axes = (axes,)
+    length = int(np.prod([s for i, s in enumerate(img.shape) if i in axes]))
     dx = 4 * perlin_octave(length, 32)
     dy = 4 * perlin_octave(length, 32)
     dz = 4 * perlin_octave(length, 32)
-    dphi = 4 * perlin_octave(length, 32)
-    dtheta = 4 * perlin_octave(length, 32)
-    dpsi = 4 * perlin_octave(length, 32)
+    dphi = perlin_octave(length, 32)
+    dtheta = perlin_octave(length, 32)
+    dpsi = perlin_octave(length, 32)
     return simulate_motion(img, dx, dy, dz, dphi, dtheta, dpsi, axes = axes)
 
 # plt.plot(perlin_octave(256, 32))
