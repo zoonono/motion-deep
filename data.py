@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from os import listdir
 from os.path import join
 
+from motionsim import motion_PD
 from transform import RealImag
 
 class CombinedDataset:
@@ -111,6 +112,20 @@ class NiiDataset2d(NdarrayDatasetSplit):
     def slice(self, d):
         dd, de = d % self.d, d // self.d
         return np.index_exp[:,:,:,dd,de]
+
+class NiiDatasetSim2d(NdarrayDatasetSplit):
+    """Chooses one echo and runs simulated motion on each example
+    in real time during training."""
+    def __init__(self, dir, echo = 0, transform = None):
+        def read(filename):
+            label = nib.load(filename).get_data().__array__()[:,:,:,echo]
+            image = motion_PD(label)
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.depth = self.example['image'].shape[3]
+    
+    def slice(self, d):
+        return np.index_exp[:,:,:,d]
 
 class NdarrayDataset2d(NdarrayDatasetSplit):
     """Splits the arrays by the D dimension."""

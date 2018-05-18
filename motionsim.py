@@ -1,6 +1,5 @@
 import numpy as np
-from matplotlib import pyplot as plt
-import time
+# from matplotlib import pyplot as plt
 
 def perlin_octave(length, min_f, weights = [.5**p for p in range(3)]):
     total = np.zeros(length)
@@ -46,7 +45,6 @@ def simulate_motion(img, dx, dy, dz, axes = 0):
     if not isinstance(axes, (tuple, list, np.ndarray)):
         axes = (axes,)
     
-    start = time.time()
     # get helper data structures
     shape = np.array(img.shape)
     grid = np.mgrid[0:shape[0], 0:shape[1], 0:shape[2]]
@@ -63,15 +61,12 @@ def simulate_motion(img, dx, dy, dz, axes = 0):
     else:
         assert False, 'img should be 3D, so axes can maximally be length 3'
     coords = coords.reshape(len(axes), coords.size // len(axes)).transpose(1,0)
-    print('Setup', time.time() - start)
     
-    start = time.time()
     img_shift = np.zeros(img.shape, dtype = np.complex64)
     for i, pt in enumerate(coords):
         # get shifts
         dr = np.array([dx[i], dy[i], dz[i]])
         
-        start2 = time.time()
         # get all points that were sampled at t = i
         if len(axes) == 1:
             idx = np.index_exp[grid[axes[0]] == pt]
@@ -82,31 +77,22 @@ def simulate_motion(img, dx, dy, dz, axes = 0):
             idx = np.index_exp[(grid[axes[0]] == pt[0]) &
                                (grid[axes[1]] == pt[1]) &
                                (grid[axes[2]] == pt[2])]
-        if i == 20: print('Get idx', time.time() - start2)
-        start2 = time.time()
         pts = np.vstack((grid[0][idx], grid[1][idx], grid[2][idx]))
-        if i == 20: print('Get pts', time.time() - start2)
         
-        start2 = time.time()
         # apply translation to image, rotation to k-space sampling points
         img_shift[idx] = img[idx] * np.exp(-2j * np.pi * np.dot(dr, pts))
-        if i == 20: print('Apply shifts', time.time() - start2)
-    print('For loop', time.time() - start, (time.time() - start) / len(coords))
     
     return img_shift
 
-def test_simulate_motion(img, axes = 0):
+def motion_PD(img, axes = 0):
     if not isinstance(axes, (tuple, list, np.ndarray)):
         axes = (axes,)
-    start = time.time()
     length = int(np.prod([s for i, s in enumerate(img.shape) if i in axes]))
     
+    img = np.fft.fftn(img)
     movement_f = length * 2
     dx = .1 * perlin_octave(length, movement_f) / length
     dy = .1 * perlin_octave(length, movement_f) / length
     dz = .1 * perlin_octave(length, movement_f) / length
-    plt.plot(dx)
-    plt.plot(dy)
-    plt.plot(dz)
-    print('Perlin', time.time() - start)
-    return simulate_motion(img, dx, dy, dz, axes = axes)
+    img = simulate_motion(img, dx, dy, dz, axes = axes)
+    return np.fft.ifftn(img)
