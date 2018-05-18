@@ -140,7 +140,7 @@ def double_weight_2d(arr, kind = 'zero'):
                    + np.array((0,0,1,1)))
     for i in range(arr.shape[0]):
         for j in range(arr.shape[1]):
-            nrr[i][j] = double_arr(arr[i][j], kind)
+            nrr[i][j] = double_arr_2d(arr[i][j], kind)
     return nrr
     
 def compute_loss(dataset, criterion, net):
