@@ -127,6 +127,53 @@ class NiiDatasetSim2d(NdarrayDatasetSplit):
     def slice(self, d):
         return np.index_exp[:,:,:,d]
 
+class NiiDatasetSim2dFull(NdarrayDatasetSplit):
+    """Splits the array by both D and E dimensions."""
+    def __init__(self, dir, transform = None):
+        def read(filename):
+            label = nib.load(filename).get_data().__array__()
+            image = np.zeros(label.shape, dtype = np.complex64)
+            for e in range(image.shape[3]):
+                image[:,:,:,e] = motion_PD(label[:,:,:,e])
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.d = self.example['image'].shape[3]
+        self.e = self.example['image'].shape[4]
+        self.depth = (self.d * self.e)
+    
+    def slice(self, d):
+        dd, de = d % self.d, d // self.d
+        return np.index_exp[:,:,:,dd,de]
+
+class NiiDatasetSimPatch(NdarrayDatasetSplit):
+    """Chooses one echo and runs simulated motion on each example
+    in real time during training.
+    """
+    def __init__(self, dir, echo = 0, transform = None, patch_R = 4):
+        def read(filename):
+            label = nib.load(filename).get_data().__array__()[:,:,:,echo]
+            image = motion_PD(label)
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.patch_R = patch_R
+        self.depth = patch_R ** 3
+        self.size = (np.array(self.example['image'].shape[1:4]) 
+            // patch_R)
+    
+    def slice(self, d):
+        """d is a base (patch_R * (patch_R - 1)) number with
+        length 3. Each digit is the starting point of the patch
+        in each dimension.
+        """
+        d1, d = d % self.patch_R, d // self.patch_R
+        d2, d3 = d % self.patch_R, d // self.patch_R
+        d1 *= self.size[0]
+        d2 *= self.size[1]
+        d3 *= self.size[2]
+        return np.index_exp[:,d1:d1+self.size[0],
+                            d2:d2+self.size[1],
+                            d3:d3+self.size[2]]
+
 class NdarrayDataset2d(NdarrayDatasetSplit):
     """Splits the arrays by the D dimension."""
     def __init__(self, dir, transform = None):
@@ -138,8 +185,6 @@ class NdarrayDataset2d(NdarrayDatasetSplit):
 
 class NdarrayDatasetPatch(NdarrayDatasetSplit):
     """Splits the arrays into patches along spatial dimensions.
-    
-    Patches have 1/2 overlap.
     """
     def __init__(self, dir, transform = None, patch_R = 8):
         super().__init__(dir, transform = transform)

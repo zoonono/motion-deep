@@ -1,5 +1,5 @@
 import numpy as np
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 
 def perlin_octave(length, min_f, weights = [.5**p for p in range(3)]):
     total = np.zeros(length)
@@ -34,6 +34,11 @@ def perlin_noise(length, freq):
     
     points = np.linspace(0, freq, num = length)
     return np.array([perlin(p) for p in points])
+
+def value_noise(length, freq):
+    noise = np.random.randn(length)
+    # plt.plot(noise)
+    return noise / max(-np.min(noise), np.max(noise))
 
 def simulate_motion(img, dx, dy, dz, axes = 0):
     """
@@ -84,15 +89,15 @@ def simulate_motion(img, dx, dy, dz, axes = 0):
     
     return img_shift
 
-def motion_PD(img, axes = 0):
+def motion_PD(img, axes = 0, noise = perlin_octave):
     if not isinstance(axes, (tuple, list, np.ndarray)):
         axes = (axes,)
     length = int(np.prod([s for i, s in enumerate(img.shape) if i in axes]))
     
     img = np.fft.fftn(img)
     movement_f = length * 2
-    dx = .1 * perlin_octave(length, movement_f) / length
-    dy = .1 * perlin_octave(length, movement_f) / length
-    dz = .1 * perlin_octave(length, movement_f) / length
+    dx = .1 * noise(length, movement_f) / length
+    dy = .1 * noise(length, movement_f) / length
+    dz = .1 * noise(length, movement_f) / length
     img = simulate_motion(img, dx, dy, dz, axes = axes)
     return np.fft.ifftn(img)

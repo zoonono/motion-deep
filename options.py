@@ -2,9 +2,9 @@ import torch
 import torch.optim as optim
 from torchvision import transforms
 
-from data import NiiDataset2d, CombinedDataset, NiiDatasetSim2d
+from data import *
 from model import DnCnn, UNet
-from transform import RealImag, MagPhase, Residual, ToTensor, PickChannel, Decimate
+from transform import *
 
 def load_options(name):
     dropprob = 0.0
@@ -45,11 +45,18 @@ def load_options(name):
         """2d UNet trained on small motion with only magnitude"""
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         optimizer = lambda params: optim.Adamax(params)
-    elif name == 'dncnn_sim_e0_mag_30':
-        depth = 30
+    elif name == 'dncnn_sim_e0_mag':
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSim2d('../data/8echo/train', echo = 0, transform = t)
         test = lambda t: NiiDatasetSim2d('../data/8echo/test', echo = 0, transform = t)
+    elif name == 'dncnn_sim_e0_mag_patch':
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train = lambda t: NiiDatasetSimPatch('../data/8echo/train', echo = 0, transform = t)
+        test = lambda t: NiiDatasetSimPatch('../data/8echo/test', echo = 0, transform = t)
+    elif name == 'dncnn_sim_mag':
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
+        test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
     return {'train': train(t), 'test': test(t), 'criterion': criterion, 
             'depth': depth, 'dropprob': dropprob, 'model': model,
             'optimizer': optimizer}
