@@ -145,6 +145,40 @@ class NiiDatasetSim2dFull(NdarrayDatasetSplit):
         dd, de = d % self.d, d // self.d
         return np.index_exp[:,:,:,dd,de]
 
+class NiiDatasetSimPatchFull(NdarrayDatasetSplit):
+    """Chooses one echo and runs simulated motion on each example
+    in real time during training.
+    """
+    def __init__(self, dir, transform = None, patch_R = 4):
+        def read(filename):
+            label = nib.load(filename).get_data().__array__()
+            image = np.zeros(label.shape, dtype = np.complex64)
+            for e in range(image.shape[3]):
+                image[:,:,:,e] = motion_PD(label[:,:,:,e])
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.patch_R = patch_R
+        self.d = patch_R ** 3
+        self.e = self.example['image'].shape[4]
+        self.depth = self.d * self.e
+        self.size = (np.array(self.example['image'].shape[1:4]) 
+            // patch_R)
+    
+    def slice(self, d):
+        """d is a base (patch_R * (patch_R - 1)) number with
+        length 3. Each digit is the starting point of the patch
+        in each dimension.
+        """
+        d, e = d % self.d, d // self.d
+        d1, d = d % self.patch_R, d // self.patch_R
+        d2, d3 = d % self.patch_R, d // self.patch_R
+        d1 *= self.size[0]
+        d2 *= self.size[1]
+        d3 *= self.size[2]
+        return np.index_exp[:,d1:d1+self.size[0],
+                            d2:d2+self.size[1],
+                            d3:d3+self.size[2],e]
+
 class NiiDatasetSimPatch(NdarrayDatasetSplit):
     """Chooses one echo and runs simulated motion on each example
     in real time during training.

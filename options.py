@@ -57,6 +57,10 @@ def load_options(name):
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
         test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
+    elif name == 'dncnn_sim_mag_patch':
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
+        test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
     return {'train': train(t), 'test': test(t), 'criterion': criterion, 
             'depth': depth, 'dropprob': dropprob, 'model': model,
             'optimizer': optimizer}
