@@ -86,6 +86,22 @@ def view(example, d):
     plt.imshow(image-pred)
     plt.show()
 
+def viewpd(example, d):
+    image = example['image']
+    pred = example['pred']
+    if len(image.shape) == 3:
+        s = np.index_exp[0,:,:]
+    else:
+        s = np.index_exp[0,:,:,d]
+    image, pred = image[s], pred[s]
+    plt.subplot(131)
+    plt.imshow(image)
+    plt.subplot(132)
+    plt.imshow(pred)
+    plt.subplot(133)
+    plt.imshow(image-pred)
+    plt.show()
+
 def view_losses(losses):
     plt.plot(losses[:,0], '-b')
     plt.plot(losses[:,1], '-r')
