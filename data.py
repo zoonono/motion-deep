@@ -116,8 +116,8 @@ class NiiDataset2d(NdarrayDatasetSplit):
 class PDDataset2d(NdarrayDatasetSplit):
     def __init__(self, dir, transform = None):
         def read(filename):
-            label = nib.load(filename).get_data().__array__()
-            image = np.zeros(label.shape, dtype = np.complex64)
+            image = nib.load(filename).get_data().__array__()
+            label = image
             return image, label
         super().__init__(dir, transform = transform, read = read)
         self.d = self.example['image'].shape[3]

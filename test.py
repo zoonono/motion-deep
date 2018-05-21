@@ -128,7 +128,7 @@ else:
 losses = np.load(join(name, 'losses.npy'))
 
 test = PD_dataset()
-#pred = NdarrayPred(test, net)
+pred = NdarrayPred(test, net)
 
 #example = pred[0]
 #save(example, suffix = '_0')

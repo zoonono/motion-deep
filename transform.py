@@ -20,9 +20,11 @@ class Resize(object):
         
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
-
-        return {'image': self.resize(image),
-                'label': self.resize(label)}
+        image = self.resize(image)
+        
+        # only resize image because this will only be used for PD, which has no label
+        return {'image': image,
+                'label': image}
 
 class Decimate(object):
     """Downsample axes in array by some factor.
