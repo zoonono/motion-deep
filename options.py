@@ -45,6 +45,7 @@ def load_options(name):
         """2d UNet trained on small motion with only magnitude"""
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         optimizer = lambda params: optim.Adamax(params)
+    # the next 4 sims are (axes = 0, noise = perlin_octave, level = 0.1, f = .5)
     elif name == 'dncnn_sim_e0_mag':
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSim2d('../data/8echo/train', echo = 0, transform = t)
@@ -61,6 +62,12 @@ def load_options(name):
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
         test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
+    # the next 4 sims are (axes = 0, noise = perlin_octave, level = 0.0125, f = 1/16)
+    # y motion only
+    elif name == 'dncnn_sim_mag2':
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
+        test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
     return {'train': train(t), 'test': test(t), 'criterion': criterion, 
             'depth': depth, 'dropprob': dropprob, 'model': model,
             'optimizer': optimizer}

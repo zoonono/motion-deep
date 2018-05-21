@@ -4,7 +4,9 @@ from matplotlib import pyplot as plt
 def perlin_octave(length, min_f, weights = [.5**p for p in range(3)]):
     total = np.zeros(length)
     for w in weights:
-        total += w * perlin_noise(length, min_f)
+        n = w*perlin_noise(length, min_f)
+        # plt.plot(n)
+        total += n # w * perlin_noise(length, min_f)
         min_f *= 2
     return total / max(-np.min(total), np.max(total))
 
@@ -89,15 +91,15 @@ def simulate_motion(img, dx, dy, dz, axes = 0):
     
     return img_shift
 
-def motion_PD(img, axes = 0, noise = perlin_octave, level = 0.1):
+def motion_PD(img, axes = 0, noise = perlin_octave, level = 0.0125, f = 1/16):
     if not isinstance(axes, (tuple, list, np.ndarray)):
         axes = (axes,)
     length = int(np.prod([s for i, s in enumerate(img.shape) if i in axes]))
     
     img = np.fft.fftn(img)
-    movement_f = length * 2
-    dx = level * noise(length, movement_f) / length
+    movement_f = int(length * f)
+    dx = np.zeros(length)#level * noise(length, movement_f) / length
     dy = level * noise(length, movement_f) / length
-    dz = level * noise(length, movement_f) / length
+    dz = np.zeros(length)#level * noise(length, movement_f) / length
     img = simulate_motion(img, dx, dy, dz, axes = axes)
     return np.fft.ifftn(img)
