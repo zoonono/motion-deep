@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.signal import decimate
+from scipy.ndimage import zoom
 import torch
 
 """Brain data should be saved as complex ndarrays (H x W x D) using 
@@ -7,6 +8,21 @@ np.save(...). After applying transforms, the data should be torch
 tensors in the form (C x H x W x D).
 image and label should always be the same dimensions.
 """
+
+class Resize(object):
+    def __init__(self, new_size):
+        self.new_size = new_size
+        
+    def resize(self, arr):
+        """Resizes image to be new_size"""
+        factor = np.array(self.new_size) / np.array(arr.shape)
+        return zoom(arr, factor)
+        
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        return {'image': self.resize(image),
+                'label': self.resize(label)}
 
 class Decimate(object):
     """Downsample axes in array by some factor.

@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import torch
 from torch.autograd import Variable
 
-from options import load_options
+from options import load_options, PD_dataset
 
 from os.path import join
 import sys
@@ -127,7 +127,8 @@ else:
                         map_location=lambda storage, loc: storage))
 losses = np.load(join(name, 'losses.npy'))
 
-pred = NdarrayPred(test, net)
+test = PD_dataset()
+#pred = NdarrayPred(test, net)
 
 #example = pred[0]
 #save(example, suffix = '_0')

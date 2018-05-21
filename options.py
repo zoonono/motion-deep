@@ -62,12 +62,21 @@ def load_options(name):
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
         test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
-    # the next 4 sims are (axes = 0, noise = perlin_octave, level = 0.0125, f = 1/16)
+    # the next 2 sims are (axes = 0, noise = perlin_octave, level = 0.0125, f = 1/16)
     # y motion only
     elif name == 'dncnn_sim_mag2':
         t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
         train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
         test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
+    elif name == 'dncnn_sim_mag_patch2':
+        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
+        train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
+        test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
     return {'train': train(t), 'test': test(t), 'criterion': criterion, 
             'depth': depth, 'dropprob': dropprob, 'model': model,
             'optimizer': optimizer}
+
+def PD_dataset():
+    t = transforms.Compose([MagPhase(), PickChannel(0), Resize((1, 256, 256, 60, 8)), ToTensor()])
+    test = PDDataset2d('../data/PD', transform = t)
+    return test

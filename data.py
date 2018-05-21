@@ -113,6 +113,21 @@ class NiiDataset2d(NdarrayDatasetSplit):
         dd, de = d % self.d, d // self.d
         return np.index_exp[:,:,:,dd,de]
 
+class PDDataset2d(NdarrayDatasetSplit):
+    def __init__(self, dir, transform = None):
+        def read(filename):
+            label = nib.load(filename).get_data().__array__()
+            image = np.zeros(label.shape, dtype = np.complex64)
+            return image, label
+        super().__init__(dir, transform = transform, read = read)
+        self.d = self.example['image'].shape[3]
+        self.e = self.example['image'].shape[4]
+        self.depth = (self.d * self.e)
+    
+    def slice(self, d):
+        dd, de = d % self.d, d // self.d
+        return np.index_exp[:,:,:,dd,de]
+
 class NiiDatasetSim2d(NdarrayDatasetSplit):
     """Chooses one echo and runs simulated motion on each example
     in real time during training."""
