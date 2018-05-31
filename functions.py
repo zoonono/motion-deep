@@ -3,6 +3,20 @@ from scipy.interpolate import interp2d
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import sys
+
+class Logger(object):
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.filename = filename
+    
+    def write(self, message):
+        self.terminal.write(message)
+        with open(self.filename, "a+") as f:
+            f.write(message)
+           
+def to_boolean(s):
+    return s.lower() in ('true', 'yes', 't', '1')
 
 def padding(d_in, d_out, kernel, stride):
     """Finds padding such that convolution outputs d_out given d_in.

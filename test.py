@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import torch
 from torch.autograd import Variable
 
-from options import load_options, PD_dataset
+from options import load_options, load_PD_dataset
 
 from os.path import join
 import sys
@@ -107,7 +107,7 @@ def view_losses(losses):
     plt.plot(losses[:,1], '-r')
     plt.show()
 
-def save(example, suffix = ''):
+def save_example(example, suffix = ''):
     np.save(join(name, 'image' + suffix), example['image'])
     np.save(join(name, 'label' + suffix), example['label'])
     np.save(join(name, 'pred' + suffix), example['pred'])
@@ -121,31 +121,29 @@ if len(sys.argv) not in (2, 3):
     exit()
 
 name = sys.argv[1]
-options = load_options(name)
-train = options['train']
-test = options['test']
-criterion = options['criterion']
-depth = options['depth']
+device = int(len(sys.argv) >= 3 and sys.argv[2])
+save = join('../models', name)
+
+options = load_options(name, testing = True)
+train, test = options['dataset']
 model = options['model']
-# dropprob = options['dropprob'] # no dropout in testing
+criterion = options['criterion']
+optimizer = options['optimizer']
 
-example = train[0]['image'] # C x H x W
-in_size = example.shape[1:]
-in_ch = example.shape[0]
-    
-net = model(in_size, in_ch, depth = depth)
-if len(sys.argv) == 2 and torch.cuda.is_available():
-    torch.cuda.set_device(int(sys.argv[2]))
-    net.load_state_dict(torch.load(join(name, 'model.pth')))
-    net.cuda()
+if torch.cuda.is_available():
+    torch.cuda.set_device(device)
+    map_location = None
+    model.cuda()
 else:
-    net.load_state_dict(torch.load(join(name, 'model.pth'), 
-                        map_location=lambda storage, loc: storage))
-losses = np.load(join(name, 'losses.npy'))
+    map_location = lambda storage, loc: storage
+    
+model.load_state_dict(torch.load(join(save, 'model.pth'), 
+                                 map_location = map_location))
+losses = np.load(join(save, 'losses.npy'))
 
-test = PD_dataset()
-pred = NdarrayPred(test, net)
+test = load_PD_dataset()
+pred = NdarrayPred(test, model)
 
 #example = pred[0]
-#save(example, suffix = '_0')
+#save_example(example, suffix = '_0')
         

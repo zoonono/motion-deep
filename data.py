@@ -10,6 +10,7 @@ from motionsim import motion_PD
 from transform import RealImag
 
 class CombinedDataset:
+    """Combines two datasets into one."""
     def __init__(self, d1, d2):
         self.d1 = d1
         self.d2 = d2
@@ -29,7 +30,7 @@ class CombinedDataset:
     def __iter__(self):
         for i in range(len(self)):
             yield self[i]
-
+            
 class NdarrayDataset:
     """Loads data saved as ndarrays in .npy files using np.save(...).
     
@@ -39,7 +40,7 @@ class NdarrayDataset:
         C: channel
         H, W, D: spatial dimensions
     """
-    def __init__(self, dir, transform = None, read = np.load):
+    def __init__(self, dir, transform, read = np.load):
         self.dir = dir
         self.files = [f for f in listdir(dir) 
                       if (fnmatch(f, '*.npy') or fnmatch(f, '*.nii'))]
@@ -67,23 +68,23 @@ class NdarrayDataset:
     
     def shuffle(self):
         random.shuffle(self.files)
-
-class NdarrayDatasetSplit(NdarrayDataset):
+        
+class Split():
     """Splits the arrays somehow (abstract class)."""
-    def __init__(self, dir, transform = None, read = np.load):
-        super().__init__(dir, transform = transform, read = read)
+    def __init__(self, dataset):
+        self.dataset = dataset
         self.i = 0
-        self.example = super().__getitem__(self.i)
+        self.example = dataset[self.i]
         self.depth = None
     
     def __len__(self):
-        return super().__len__() * self.depth
+        return len(self.dataset) * self.depth
     
     def __getitem__(self, i):
         i, d = i // self.depth, i % self.depth
         if i != self.i:
             self.i = i
-            self.example = super().__getitem__(self.i)
+            self.example = self.dataset[self.i]
         return self.pick(d)
     
     def pick(self, d):
@@ -93,150 +94,31 @@ class NdarrayDatasetSplit(NdarrayDataset):
        
     def slice(self, d):
         raise NotImplementedError
-        
-class NiiDataset2d(NdarrayDatasetSplit):
-    """Splits the array by both D and E dimensions."""
-    def __init__(self, dir, transform = None):
-        def read(filename):
-            slash = filename.rfind('/')
-            img = (filename[:slash] + "/image" + filename[slash:-4] + 
-                   '_M' + filename[-4:])
-            image = nib.load(img).get_data().__array__()
-            label = nib.load(filename).get_data().__array__()
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
-        self.d = self.example['image'].shape[3]
-        self.e = self.example['image'].shape[4]
-        self.depth = (self.d * self.e)
+
+class Split4th(Split):
+    """Splits the arrays by the 4th spatial dimension."""
+    def __init__(self, dataset):
+        super().__init__(dataset)
+        self.depth = self.example['image'].shape[4]
     
     def slice(self, d):
-        dd, de = d % self.d, d // self.d
-        return np.index_exp[:,:,:,dd,de]
-
-class PDDataset2d(NdarrayDatasetSplit):
-    def __init__(self, dir, transform = None):
-        def read(filename):
-            image = nib.load(filename).get_data().__array__()
-            label = image
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
-        self.d = self.example['image'].shape[3]
-        self.e = self.example['image'].shape[4]
-        self.depth = (self.d * self.e)
+        return np.index_exp[:,:,:,:,d]
     
-    def slice(self, d):
-        dd, de = d % self.d, d // self.d
-        return np.index_exp[:,:,:,dd,de]
-
-class NiiDatasetSim2d(NdarrayDatasetSplit):
-    """Chooses one echo and runs simulated motion on each example
-    in real time during training."""
-    def __init__(self, dir, echo = 0, transform = None):
-        def read(filename):
-            label = nib.load(filename).get_data().__array__()[:,:,:,echo]
-            image = motion_PD(label)
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
+class Split2d(Split):
+    """Splits the arrays by the 3rd spatial dimension."""
+    def __init__(self, dataset):
+        super().__init__(dataset)
         self.depth = self.example['image'].shape[3]
     
     def slice(self, d):
         return np.index_exp[:,:,:,d]
 
-class NiiDatasetSim2dFull(NdarrayDatasetSplit):
-    """Splits the array by both D and E dimensions."""
-    def __init__(self, dir, transform = None):
-        def read(filename):
-            label = nib.load(filename).get_data().__array__()
-            image = np.zeros(label.shape, dtype = np.complex64)
-            for e in range(image.shape[3]):
-                image[:,:,:,e] = motion_PD(label[:,:,:,e])
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
-        self.d = self.example['image'].shape[3]
-        self.e = self.example['image'].shape[4]
-        self.depth = (self.d * self.e)
-    
-    def slice(self, d):
-        dd, de = d % self.d, d // self.d
-        return np.index_exp[:,:,:,dd,de]
-
-class NiiDatasetSimPatchFull(NdarrayDatasetSplit):
-    """Chooses one echo and runs simulated motion on each example
-    in real time during training.
-    """
-    def __init__(self, dir, transform = None, patch_R = 4):
-        def read(filename):
-            label = nib.load(filename).get_data().__array__()
-            image = np.zeros(label.shape, dtype = np.complex64)
-            for e in range(image.shape[3]):
-                image[:,:,:,e] = motion_PD(label[:,:,:,e])
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
-        self.patch_R = patch_R
-        self.d = patch_R ** 3
-        self.e = self.example['image'].shape[4]
-        self.depth = self.d * self.e
-        self.size = (np.array(self.example['image'].shape[1:4]) 
-            // patch_R)
-    
-    def slice(self, d):
-        """d is a base (patch_R * (patch_R - 1)) number with
-        length 3. Each digit is the starting point of the patch
-        in each dimension.
-        """
-        d, e = d % self.d, d // self.d
-        d1, d = d % self.patch_R, d // self.patch_R
-        d2, d3 = d % self.patch_R, d // self.patch_R
-        d1 *= self.size[0]
-        d2 *= self.size[1]
-        d3 *= self.size[2]
-        return np.index_exp[:,d1:d1+self.size[0],
-                            d2:d2+self.size[1],
-                            d3:d3+self.size[2],e]
-
-class NiiDatasetSimPatch(NdarrayDatasetSplit):
-    """Chooses one echo and runs simulated motion on each example
-    in real time during training.
-    """
-    def __init__(self, dir, echo = 0, transform = None, patch_R = 4):
-        def read(filename):
-            label = nib.load(filename).get_data().__array__()[:,:,:,echo]
-            image = motion_PD(label)
-            return image, label
-        super().__init__(dir, transform = transform, read = read)
-        self.patch_R = patch_R
-        self.depth = patch_R ** 3
-        self.size = (np.array(self.example['image'].shape[1:4]) 
-            // patch_R)
-    
-    def slice(self, d):
-        """d is a base (patch_R * (patch_R - 1)) number with
-        length 3. Each digit is the starting point of the patch
-        in each dimension.
-        """
-        d1, d = d % self.patch_R, d // self.patch_R
-        d2, d3 = d % self.patch_R, d // self.patch_R
-        d1 *= self.size[0]
-        d2 *= self.size[1]
-        d3 *= self.size[2]
-        return np.index_exp[:,d1:d1+self.size[0],
-                            d2:d2+self.size[1],
-                            d3:d3+self.size[2]]
-
-class NdarrayDataset2d(NdarrayDatasetSplit):
-    """Splits the arrays by the D dimension."""
-    def __init__(self, dir, transform = None):
-        super().__init__(dir, transform = transform)
-        self.depth = self.example['image'].shape[3]
-    
-    def slice(self, d):
-        return np.index_exp[:,:,:,d]
-
-class NdarrayDatasetPatch(NdarrayDatasetSplit):
+class SplitPatch(Split):
     """Splits the arrays into patches along spatial dimensions.
+    The arrays must be C x H x W x D
     """
-    def __init__(self, dir, transform = None, patch_R = 8):
-        super().__init__(dir, transform = transform)
+    def __init__(self, dataset, patch_R = 8):
+        super().__init__(dataset)
         self.patch_R = patch_R
         self.depth = patch_R ** 3
         self.size = (np.array(self.example['image'].shape[1:4]) 
@@ -255,3 +137,55 @@ class NdarrayDatasetPatch(NdarrayDatasetSplit):
         return np.index_exp[:,d1:d1+self.size[0],
                             d2:d2+self.size[1],
                             d3:d3+self.size[2]]
+
+def r1(filename):
+    """Loads nii files where the directory structure is:
+    v dir
+        v image
+            brain1_M.nii
+            brain2_M.nii
+            ...
+        brain1.nii
+        brain2.nii
+        ...
+    """
+    slash = filename.rfind('/')
+    img = (filename[:slash] + "/image" + filename[slash:-4] + 
+           '_M' + filename[-4:])
+    image = nib.load(img).get_data().__array__()
+    label = nib.load(filename).get_data().__array__()
+    return image, label
+
+def r2(filename):
+    """Loads nii files where the directory structure is:
+    v dir
+        brain1.nii
+        brain2.nii
+        ...
+    Used for PD data where there is no label.
+    """
+    image = nib.load(filename).get_data().__array__()
+    return image, None
+
+def r3(filename):
+    """Loads nii files where the directory structure is:
+    v dir
+        brain1.nii
+        brain2.nii
+        ...
+    Uses motion simulation to create image-label pairs during training.
+    """
+    label = nib.load(filename).get_data().__array__()
+    image = np.zeros(label.shape, dtype = np.complex64)
+    for e in range(image.shape[3]):
+        image[:,:,:,e] = motion_PD(label[:,:,:,e])
+    return image, label
+
+def NiiDataset(dir, transform):
+    return Split4th(NdarrayDataset(dir, transform, read = r1))
+
+def PdDataset(dir, transform):
+    return Split4th(NdarrayDataset(dir, transform, read = r2))
+
+def NiiDatasetSim(dir, transform):
+    return Split4th(NdarrayDataset(dir, transform, read = r3))

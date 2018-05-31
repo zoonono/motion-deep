@@ -1,82 +1,54 @@
 import torch
 import torch.optim as optim
-from torchvision import transforms
 
-from data import *
+from data import NiiDataset, PdDataset, Split2d, SplitPatch
+from functions import MultiModule
 from model import DnCnn, UNet
-from transform import *
+import transform as t
 
-def load_options(name):
-    dropprob = 0.0
-    train = lambda t: NiiDataset2d('../data/8echo/train', transform = t)
-    test = lambda t: NiiDataset2d('../data/8echo/test', transform = t)
-    criterion = torch.nn.MSELoss()
-    if 'dncnn' in name:
-        depth = 20
-        model = DnCnn
-    elif 'unet' in name:
-        depth = 4
-        model = UNet
-    optimizer = lambda params: optim.Adam(params)
-    
-    if name == 'dncnn_smallm_twoch':
-        """2d DnCnn trained on small motion with two-channel architecture"""
-        t = transforms.Compose([RealImag(), Residual(), ToTensor()])
-    elif name == 'dncnn_smallm_mag':
-        """2d DnCnn trained on small motion with only magnitude"""
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-    elif name == 'dncnn_smallm_real':
-        """2d DnCnn trained on small motion with only real"""
-        t = transforms.Compose([RealImag(), PickChannel(0), Residual(), ToTensor()])
-    elif name == 'dncnn_smallm_twoch_drop':
-        """2d DnCnn trained on small motion with two-channel architecture and dropout"""
-        t = transforms.Compose([RealImag(), Residual(), ToTensor()])
-        dropprob = 0.5
-    elif name == 'dncnn_smallm_mag_8and16':
-        """Includes both 8echo and 16echo data"""
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train1 = NiiDataset2d('../data/8echo/train', transform = t)
-        test1 = NiiDataset2d('../data/8echo/test', transform = t)
-        train2 = NiiDataset2d('../data/16echo/train', transform = t)
-        test2 = NiiDataset2d('../data/16echo/test', transform = t)
-        train = lambda t: CombinedDataset(train1, train2)
-        test = lambda t: CombinedDataset(test1, test2)
-    elif name == 'unet_smallm_mag':
-        """2d UNet trained on small motion with only magnitude"""
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        optimizer = lambda params: optim.Adamax(params)
-    # the next 4 sims are (axes = 0, noise = perlin_octave, level = 0.1, f = .5)
-    elif name == 'dncnn_sim_e0_mag':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSim2d('../data/8echo/train', echo = 0, transform = t)
-        test = lambda t: NiiDatasetSim2d('../data/8echo/test', echo = 0, transform = t)
-    elif name == 'dncnn_sim_e0_mag_patch':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSimPatch('../data/8echo/train', echo = 0, transform = t)
-        test = lambda t: NiiDatasetSimPatch('../data/8echo/test', echo = 0, transform = t)
-    elif name == 'dncnn_sim_mag':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
-        test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
-    elif name == 'dncnn_sim_mag_patch':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
-        test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
-    # the next 2 sims are (axes = 0, noise = perlin_octave, level = 0.0125, f = 1/16)
-    # y motion only
-    elif name == 'dncnn_sim_mag2':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSim2dFull('../data/8echo/train', transform = t)
-        test = lambda t: NiiDatasetSim2dFull('../data/8echo/test', transform = t)
-    elif name == 'dncnn_sim_mag_patch2':
-        t = transforms.Compose([MagPhase(), PickChannel(0), Residual(), ToTensor()])
-        train = lambda t: NiiDatasetSimPatchFull('../data/8echo/train', transform = t)
-        test = lambda t: NiiDatasetSimPatchFull('../data/8echo/test', transform = t)
-    return {'train': train(t), 'test': test(t), 'criterion': criterion, 
-            'depth': depth, 'dropprob': dropprob, 'model': model,
-            'optimizer': optimizer}
-
-def PD_dataset():
-    t = transforms.Compose([MagPhase(), PickChannel(0), Resize((1, 256, 256, 60, 8)), ToTensor()])
-    test = PDDataset2d('../data/PD', transform = t)
+def load_PD_dataset():
+    tr = t.Transforms((t.MagPhase(), t.PickChannel(0), 
+                       t.Resize((1, 256, 256, 60, 8))), apply_to = 'image')
+    tr = MultiModule((tr, t.ToTensor()))
+    test = Split2d(PdDataset('../data/PD', transform = tr))
     return test
+
+def load_options(name, testing = False):
+    """Saves experiment options under names to load in train and test"""
+    if name == 'dncnn_mag':
+        transform = t.Transforms((t.MagPhase(), t.PickChannel(0)), 
+                                 apply_to = 'both')
+        transform = MultiModule(transform, t.Residual(), t.ToTensor())
+        train = Split2d(NiiDataset('../data/8echo/train', transform))
+        test = Split2d(NiiDataset('../data/8echo/test', transform))
+        model, depth, dropprob = DnCnn, 20, 0.0
+        optimizer = optim.Adam
+        criterion = torch.nn.MSELoss()
+    if name == 'dncnn_mag_patch':
+        transform = t.Transforms((t.MagPhase(), t.PickChannel(0)), 
+                                 apply_to = 'both')
+        transform = MultiModule(transform, t.Residual(), t.ToTensor())
+        train = SplitPatch(NiiDataset('../data/8echo/train', transform))
+        test = SplitPatch(NiiDataset('../data/8echo/test', transform))
+        model, depth, dropprob = DnCnn, 20, 0.0
+        optimizer = optim.Adam
+        criterion = torch.nn.MSELoss()
+    elif name == 'unet_mag':
+        transform = t.Transforms((t.MagPhase(), t.PickChannel(0)), 
+                                 apply_to = 'both')
+        transform = MultiModule(transform, t.Residual(), t.ToTensor())
+        train = Split2d(NiiDataset('../data/8echo/train', transform))
+        test = Split2d(NiiDataset('../data/8echo/test', transform))
+        model, depth, dropprob = UNet, 4, 0.0
+        optimizer = optim.Adamax
+        criterion = torch.nn.MSELoss()
+    
+    if testing: # No dropout during testing
+        dropprob = 0.0
+    example = train[0]['image']
+    in_size = example.shape[1:]
+    in_ch = example.shape[0]
+    model = model(in_size, in_ch, depth = depth, dropprob = dropprob)
+    optimizer = optimizer(model.parameters())
+    return {'dataset': (train, test), 'model': model, 'optimizer': optimizer,
+            'criterion': criterion}

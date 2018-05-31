@@ -1,5 +1,4 @@
 import numpy as np
-from matplotlib import pyplot as plt
 
 def perlin_octave(length, min_f, weights = [.5**p for p in range(3)]):
     total = np.zeros(length)
